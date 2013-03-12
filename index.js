@@ -41,6 +41,16 @@ function createResponse (tmpFiles, callback) {
   });
 }
 
+function removeTmpFiles (tmpFiles, callback) {
+  async.parallel([
+    function (cb) { fs.unlink(tmpFiles.tmpKeyFile, cb); },
+    function (cb) { fs.unlink(tmpFiles.tmpPubFile, cb); }
+  ], function (err) {
+    if (err) return callback(err);
+    callback(null);
+  });
+}
+
 exports.generate = function (options, callback) {
   if(!options.subj){
     return callback(new Error('subj is required'));
@@ -49,9 +59,19 @@ exports.generate = function (options, callback) {
   
   generateTempFiles(function (err, files) {
     if (err) return callback(err);
+
     executeCommand(options, files, function (err) {
       if (err) return callback(err);
-      createResponse(files, callback);
+
+      createResponse(files, function (err, result) {
+        if(err) return callback(err);
+        
+        removeTmpFiles(files, function (err) {
+          if(err) return callback(err);
+          
+          callback(null, result);
+        });
+      });
     });
   });
 };
