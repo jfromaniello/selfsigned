@@ -28,16 +28,27 @@ function executeCommand (options, tmpFiles, callback) {
   exec(command, callback);
 }
 
-function createResponse (tmpFiles, callback) {
+//openssl crl2pkcs7 -nocrl -certfile contoso1.crt -out contoso1.p7b
+function createResponse (options, tmpFiles, callback) {
   async.parallel([
     function (cb) { fs.readFile(tmpFiles.tmpKeyFile, cb); },
-    function (cb) { fs.readFile(tmpFiles.tmpPubFile, cb); }
+    function (cb) { fs.readFile(tmpFiles.tmpPubFile, cb); },
+    function (cb) {
+      if (!options.pkcs7) return cb();
+      exec('openssl crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile, function (err, stdout) {
+        cb(err, stdout);
+      });
+    }
   ], function (err, files) {
     if (err) return callback(err);
-    callback(null, {
+    var result = {
       privateKey: files[0].toString(),
       publicKey:  files[1].toString()
-    });
+    };
+    if(options.pkcs7) {
+      result.publicPkcs7Key = files[2];
+    }
+    callback(null, result);
   });
 }
 
@@ -63,7 +74,7 @@ exports.generate = function (options, callback) {
     executeCommand(options, files, function (err) {
       if (err) return callback(err);
 
-      createResponse(files, function (err, result) {
+      createResponse(options, files, function (err, result) {
         if(err) return callback(err);
         
         removeTmpFiles(files, function (err) {
