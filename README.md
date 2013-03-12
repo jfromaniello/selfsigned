@@ -6,6 +6,9 @@ Generate a self signed x509 certificate from node.js.
 
 	npm install selfsigned
 
+Note: this runs openssl CLI so you need to have openssl in your path. It works for windows as well. 
+
+
 ## Usage
 
 ~~~javascript
