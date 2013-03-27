@@ -4,6 +4,7 @@ var async = require('async');
 var tmp = require('tmp');
 var exec = require('child_process').exec;
 var fs = require('fs');
+var path = require('path');
 
 function generateTempFiles (callback) {
   async.parallel([
@@ -14,7 +15,7 @@ function generateTempFiles (callback) {
     return callback(null, {
       tmpKeyFile: results[0][0],
       tmpPubFile: results[1][0]
-    });    
+    });
   });
 }
 
@@ -23,8 +24,15 @@ function executeCommand (options, tmpFiles, callback) {
   command += ' -days ' + options.days.toString();
   command += ' -nodes -x509';
   command += ' -subj "' + options.subj + '"';
-  command += ' -keyout ' + tmpFiles.tmpKeyFile; 
+  command += ' -keyout ' + tmpFiles.tmpKeyFile;
   command += ' -out ' + tmpFiles.tmpPubFile;
+
+  if (process.platform === 'win32') {
+    command = '"' + path.join(__dirname, '/external/', process.arch, 'bin', 'openssl.exe') + '"' + command.replace(/^openssl/, '') +
+              ' -config "' + path.join(__dirname, '/external/', process.arch, 'openssl.cnf') + '"';
+    console.log(command);
+  }
+
   exec(command, callback);
 }
 
@@ -35,7 +43,13 @@ function createResponse (options, tmpFiles, callback) {
     function (cb) { fs.readFile(tmpFiles.tmpPubFile, cb); },
     function (cb) {
       if (!options.pkcs7) return cb();
-      exec('openssl crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile, function (err, stdout) {
+      var command;
+      if (process.platform === 'win32') {
+        command = '"' + path.join(__dirname, '/external/', process.arch, 'bin', 'openssl.exe') + '" crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile;
+      } else {
+        command = 'openssl crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile;
+      }
+      exec(command, function (err, stdout) {
         cb(err, stdout);
       });
     }
