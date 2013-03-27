@@ -1,6 +1,6 @@
 {
   "name": "selfsigned",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
