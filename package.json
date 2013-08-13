@@ -1,10 +1,10 @@
 {
   "name": "selfsigned",
-  "version": "0.0.6",
+  "version": "1.0.0",
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "node ./test/tests.js"
   },
   "repository": {
     "type": "git",
@@ -17,14 +17,15 @@
     "certificates"
   ],
   "author": "José F. Romaniello <jfromaniello@gmail.com> (http://joseoncode.com)",
+  "contirbutors": [
+    { 
+      "name" : "Paolo Fragomeni", 
+      "email" : "paolo@async.ly",
+      "url" : "http://async.ly"
+    }
+  ],
   "license": "MIT",
-  "devDependencies": {
-    "chai": "~1.5.0",
-    "mocha": "~1.8.2",
-    "rimraf": "~2.1.4"
-  },
   "dependencies": {
-    "tmp": "0.0.16",
-    "async": "~0.2.6"
+    "node-forge": "~0.1.15"
   }
 }

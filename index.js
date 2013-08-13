@@ -1,102 +1,82 @@
-// openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=contoso.auth0.com" -keyout contoso.key  -out contoso.cer
+var forge = require('node-forge')
+var fs = require('fs')
 
-var async = require('async');
-var tmp = require('tmp');
-var exec = require('child_process').exec;
-var fs = require('fs');
-var path = require('path');
+exports.generate = function generate(attrs) {
 
-function generateTempFiles (callback) {
-  async.parallel([
-    tmp.file.bind(tmp),
-    tmp.file.bind(tmp)
-  ], function (err, results) {
-    if(err) return callback(err);
-    return callback(null, {
-      tmpKeyFile: results[0][0],
-      tmpPubFile: results[1][0]
-    });
-  });
-}
+  var keys = forge.pki.rsa.generateKeyPair(1024)
+  var cert = forge.pki.createCertificate()
 
-function executeCommand (options, tmpFiles, callback) {
-  var command = 'openssl req -new -newkey rsa:2048';
-  command += ' -days ' + options.days.toString();
-  command += ' -nodes -x509';
-  command += ' -subj "' + options.subj + '"';
-  command += ' -keyout ' + tmpFiles.tmpKeyFile;
-  command += ' -out ' + tmpFiles.tmpPubFile;
-
-  if (process.platform === 'win32') {
-    command = '"' + path.join(__dirname, '/external/', process.arch, 'bin', 'openssl.exe') + '"' + command.replace(/^openssl/, '') +
-              ' -config "' + path.join(__dirname, '/external/', process.arch, 'openssl.cnf') + '"';
-    console.log(command);
-  }
-
-  exec(command, callback);
-}
-
-//openssl crl2pkcs7 -nocrl -certfile contoso1.crt -out contoso1.p7b
-function createResponse (options, tmpFiles, callback) {
-  async.parallel([
-    function (cb) { fs.readFile(tmpFiles.tmpKeyFile, cb); },
-    function (cb) { fs.readFile(tmpFiles.tmpPubFile, cb); },
-    function (cb) {
-      if (!options.pkcs7) return cb();
-      var command;
-      if (process.platform === 'win32') {
-        command = '"' + path.join(__dirname, '/external/', process.arch, 'bin', 'openssl.exe') + '" crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile;
-      } else {
-        command = 'openssl crl2pkcs7 -nocrl -certfile ' + tmpFiles.tmpPubFile;
-      }
-      exec(command, function (err, stdout) {
-        cb(err, stdout);
-      });
-    }
-  ], function (err, files) {
-    if (err) return callback(err);
-    var result = {
-      privateKey: files[0].toString(),
-      publicKey:  files[1].toString()
-    };
-    if(options.pkcs7) {
-      result.publicPkcs7Key = files[2];
-    }
-    callback(null, result);
-  });
-}
-
-function removeTmpFiles (tmpFiles, callback) {
-  async.parallel([
-    function (cb) { fs.unlink(tmpFiles.tmpKeyFile, cb); },
-    function (cb) { fs.unlink(tmpFiles.tmpPubFile, cb); }
-  ], function (err) {
-    if (err) return callback(err);
-    callback(null);
-  });
-}
-
-exports.generate = function (options, callback) {
-  if(!options.subj){
-    return callback(new Error('subj is required'));
-  }
-  options.days = options.days || 30;
+  cert.serialNumber = '01'
+  cert.validity.notBefore = new Date()
+  cert.validity.notAfter = new Date()
+  cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1)
   
-  generateTempFiles(function (err, files) {
-    if (err) return callback(err);
+  attrs = attrs || [{
+    name: 'commonName',
+    value: 'example.org'
+  }, {
+    name: 'countryName',
+    value: 'US'
+  }, {
+    shortName: 'ST',
+    value: 'Virginia'
+  }, {
+    name: 'localityName',
+    value: 'Blacksburg'
+  }, {
+    name: 'organizationName',
+    value: 'Test'
+  }, {
+    shortName: 'OU',
+    value: 'Test'
+  }]
 
-    executeCommand(options, files, function (err) {
-      if (err) return callback(err);
+  cert.setSubject(attrs)
+  cert.setIssuer(attrs)
+  
+  cert.setExtensions([{
+    name: 'basicConstraints',
+    cA: true
+  }, {
+    name: 'keyUsage',
+    keyCertSign: true,
+    digitalSignature: true,
+    nonRepudiation: true,
+    keyEncipherment: true,
+    dataEncipherment: true
+  }, {
+    name: 'subjectAltName',
+    altNames: [{
+      type: 6, // URI
+      value: 'http://example.org/webid#me'
+    }]
+  }])
+  
+  cert.publicKey = keys.publicKey
 
-      createResponse(options, files, function (err, result) {
-        if(err) return callback(err);
-        
-        removeTmpFiles(files, function (err) {
-          if(err) return callback(err);
-          
-          callback(null, result);
-        });
-      });
-    });
-  });
-};
+  cert.sign(keys.privateKey)
+
+  var pem = {
+    private: forge.pki.privateKeyToPem(keys.privateKey),
+    public: forge.pki.publicKeyToPem(keys.publicKey),
+    cert: forge.pki.certificateToPem(cert)
+  }
+
+  var caStore = forge.pki.createCaStore()
+  caStore.addCertificate(cert)
+
+  try {
+    forge.pki.verifyCertificateChain(caStore, [cert],
+      function(vfd, depth, chain) {
+        if(vfd !== true) {
+          throw new Error('Certificate could not be verified.')
+        }
+        return true
+    })
+  }
+  catch(ex) {
+    throw new Error(ex)
+  }
+
+  return pem
+}
