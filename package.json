@@ -26,6 +26,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "node-forge": "~0.1.15"
+    "node-forge": "git+https://github.com/digitalbazaar/forge.git"
   }
 }
