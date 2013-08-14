@@ -1,7 +1,7 @@
 var forge = require('node-forge')
 var fs = require('fs')
 
-exports.generate = function generate(attrs) {
+exports.generate = function generate(attrs, options) {
 
   var keys = forge.pki.rsa.generateKeyPair(1024)
   var cert = forge.pki.createCertificate()
@@ -60,6 +60,12 @@ exports.generate = function generate(attrs) {
     private: forge.pki.privateKeyToPem(keys.privateKey),
     public: forge.pki.publicKeyToPem(keys.publicKey),
     cert: forge.pki.certificateToPem(cert)
+  }
+  
+  if (options && options.pkcs7) {
+    var p7 = forge.pkcs7.createSignedData()
+    p7.addCertificate(cert)
+    pem.pkcs7 = forge.pkcs7.messageToPem(p7)
   }
 
   var caStore = forge.pki.createCaStore()
