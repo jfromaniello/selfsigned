@@ -1,8 +1,20 @@
 var forge = require('node-forge')
 var fs = require('fs')
 
-exports.generate = function generate(attrs, options) {
+function getAlgorithm(key) {
+  console.log(key);
+  switch (key) {
+    case 'sha512':
+      return forge.md.sha512.create()
+    case 'sha256':
+      return forge.md.sha256.create()
+    case 'sha1':
+    default:
+      return forge.md.sha1.create()
+  }
+}
 
+exports.generate = function generate(attrs, options) {
   var keys = forge.pki.rsa.generateKeyPair(1024)
   var cert = forge.pki.createCertificate()
 
@@ -10,7 +22,7 @@ exports.generate = function generate(attrs, options) {
   cert.validity.notBefore = new Date()
   cert.validity.notAfter = new Date()
   cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1)
-  
+
   attrs = attrs || [{
     name: 'commonName',
     value: 'example.org'
@@ -33,7 +45,7 @@ exports.generate = function generate(attrs, options) {
 
   cert.setSubject(attrs)
   cert.setIssuer(attrs)
-  
+
   cert.setExtensions([{
     name: 'basicConstraints',
     cA: true
@@ -51,17 +63,17 @@ exports.generate = function generate(attrs, options) {
       value: 'http://example.org/webid#me'
     }]
   }])
-  
+
   cert.publicKey = keys.publicKey
 
-  cert.sign(keys.privateKey)
+  cert.sign(keys.privateKey, getAlgorithm(options && options.algorithm))
 
   var pem = {
     private: forge.pki.privateKeyToPem(keys.privateKey),
     public: forge.pki.publicKeyToPem(keys.publicKey),
     cert: forge.pki.certificateToPem(cert)
   }
-  
+
   if (options && options.pkcs7) {
     var p7 = forge.pkcs7.createSignedData()
     p7.addCertificate(cert)

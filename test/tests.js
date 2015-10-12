@@ -30,3 +30,12 @@ exec('openssl crl2pkcs7 -nocrl -certfile /tmp/tmp.crt', function (err, stdout, s
                       .replace(/\n/g, '\r\n'); //node-forge uses \r\n
   assert.equal(pems.pkcs7, expected)
 });
+
+var pems_sha1 = generate(null, { algorithm: 'sha1' });
+assert.ok(forge.pki.certificateFromPem(pems_sha1.cert).siginfo.algorithmOid == forge.pki.oids['sha1WithRSAEncryption'], 'can generate sha1 certs')
+
+var pems_sha256 = generate(null, { algorithm: 'sha256' });
+assert.ok(forge.pki.certificateFromPem(pems_sha256.cert).siginfo.algorithmOid == forge.pki.oids['sha256WithRSAEncryption'], 'can generate sha256 certs')
+
+var pems_sha512 = generate(null, { algorithm: 'sha512' });
+assert.ok(forge.pki.certificateFromPem(pems_sha512.cert).siginfo.algorithmOid == forge.pki.oids['sha512WithRSAEncryption'], 'can generate sha512 certs')
