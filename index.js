@@ -2,10 +2,7 @@ var forge = require('node-forge')
 var fs = require('fs')
 
 function getAlgorithm(key) {
-  console.log(key);
   switch (key) {
-    case 'sha512':
-      return forge.md.sha512.create()
     case 'sha256':
       return forge.md.sha256.create()
     case 'sha1':

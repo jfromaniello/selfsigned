@@ -36,6 +36,3 @@ assert.ok(forge.pki.certificateFromPem(pems_sha1.cert).siginfo.algorithmOid == f
 
 var pems_sha256 = generate(null, { algorithm: 'sha256' });
 assert.ok(forge.pki.certificateFromPem(pems_sha256.cert).siginfo.algorithmOid == forge.pki.oids['sha256WithRSAEncryption'], 'can generate sha256 certs')
-
-var pems_sha512 = generate(null, { algorithm: 'sha512' });
-assert.ok(forge.pki.certificateFromPem(pems_sha512.cert).siginfo.algorithmOid == forge.pki.oids['sha512WithRSAEncryption'], 'can generate sha512 certs')
