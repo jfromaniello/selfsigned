@@ -17,11 +17,16 @@
     "certificates"
   ],
   "author": "José F. Romaniello <jfromaniello@gmail.com> (http://joseoncode.com)",
-  "contirbutors": [
+  "contributors": [
     {
       "name": "Paolo Fragomeni",
       "email": "paolo@async.ly",
       "url": "http://async.ly"
+    },
+    {
+      "name": "Charles Bushong",
+      "email": "bushong1@gmail.com  ",
+      "url": "http://github.com/bushong1"
     }
   ],
   "license": "MIT",
