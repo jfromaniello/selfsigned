@@ -80,7 +80,10 @@ exports.generate = function generate(attrs, options) {
 
     for(var i = 0; i < clientAttrs.length; i++) {
       if(clientAttrs[i].name === 'commonName') {
-        clientAttrs[i] = { name: 'commonName', value: 'John Doe jdoe123' };
+        if( options.clientCertificateCN )
+          clientAttrs[i] = { name: 'commonName', value: options.clientCertificateCN };
+        else
+          clientAttrs[i] = { name: 'commonName', value: 'John Doe jdoe123' };
       }
     }
 
