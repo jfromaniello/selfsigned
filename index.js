@@ -4,22 +4,23 @@ var fs = require('fs')
 function getAlgorithm(key) {
   switch (key) {
     case 'sha256':
-      return forge.md.sha256.create()
+      return forge.md.sha256.create();
     case 'sha1':
     default:
-      return forge.md.sha1.create()
+      return forge.md.sha1.create();
   }
 }
 
 exports.generate = function generate(attrs, options) {
-  var keys = forge.pki.rsa.generateKeyPair(1024)
-  var cert = forge.pki.createCertificate()
+  options = options || {};
+  var keys = forge.pki.rsa.generateKeyPair(1024);
+  var cert = forge.pki.createCertificate();
 
-  cert.serialNumber = '01'
-  cert.validity.notBefore = new Date()
-  cert.validity.notAfter = new Date()
-  cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365))
-  
+  cert.serialNumber = '01';
+  cert.validity.notBefore = new Date();
+  cert.validity.notAfter = new Date();
+  cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365));
+
   attrs = attrs || [{
     name: 'commonName',
     value: 'example.org'
@@ -84,7 +85,7 @@ exports.generate = function generate(attrs, options) {
     clientcert.validity.notBefore = new Date()
     clientcert.validity.notAfter = new Date()
     clientcert.validity.notAfter.setFullYear(clientcert.validity.notBefore.getFullYear() + 1)
-    
+
     var clientAttrs = JSON.parse(JSON.stringify(attrs));
 
     for(var i = 0; i < clientAttrs.length; i++) {
