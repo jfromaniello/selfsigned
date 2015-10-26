@@ -1,9 +1,17 @@
 var forge = require('node-forge')
 var fs = require('fs')
 
-exports.generate = function generate(attrs, options) {
-  options = options || {};
+function getAlgorithm(key) {
+  switch (key) {
+    case 'sha256':
+      return forge.md.sha256.create()
+    case 'sha1':
+    default:
+      return forge.md.sha1.create()
+  }
+}
 
+exports.generate = function generate(attrs, options) {
   var keys = forge.pki.rsa.generateKeyPair(1024)
   var cert = forge.pki.createCertificate()
 
@@ -34,7 +42,7 @@ exports.generate = function generate(attrs, options) {
 
   cert.setSubject(attrs)
   cert.setIssuer(attrs)
-  
+
   cert.setExtensions([{
     name: 'basicConstraints',
     cA: true
@@ -52,17 +60,17 @@ exports.generate = function generate(attrs, options) {
       value: 'http://example.org/webid#me'
     }]
   }])
-  
+
   cert.publicKey = keys.publicKey
 
-  cert.sign(keys.privateKey)
+  cert.sign(keys.privateKey, getAlgorithm(options && options.algorithm))
 
   var pem = {
     private: forge.pki.privateKeyToPem(keys.privateKey),
     public: forge.pki.publicKeyToPem(keys.publicKey),
     cert: forge.pki.certificateToPem(cert)
   }
-  
+
   if (options && options.pkcs7) {
     var p7 = forge.pkcs7.createSignedData()
     p7.addCertificate(cert)
