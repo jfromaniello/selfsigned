@@ -2,6 +2,7 @@ var forge = require('node-forge')
 var fs = require('fs')
 
 exports.generate = function generate(attrs, options) {
+  options = options || {};
 
   var keys = forge.pki.rsa.generateKeyPair(1024)
   var cert = forge.pki.createCertificate()
@@ -9,7 +10,7 @@ exports.generate = function generate(attrs, options) {
   cert.serialNumber = '01'
   cert.validity.notBefore = new Date()
   cert.validity.notAfter = new Date()
-  cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1)
+  cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365))
   
   attrs = attrs || [{
     name: 'commonName',
