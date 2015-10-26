@@ -77,6 +77,46 @@ exports.generate = function generate(attrs, options) {
     pem.pkcs7 = forge.pkcs7.messageToPem(p7)
   }
 
+  if (options && options.clientCertificate) {
+    var clientkeys = forge.pki.rsa.generateKeyPair(1024)
+    var clientcert = forge.pki.createCertificate()
+    clientcert.serialNumber = '02'
+    clientcert.validity.notBefore = new Date()
+    clientcert.validity.notAfter = new Date()
+    clientcert.validity.notAfter.setFullYear(clientcert.validity.notBefore.getFullYear() + 1)
+    
+    var clientAttrs = JSON.parse(JSON.stringify(attrs));
+
+    for(var i = 0; i < clientAttrs.length; i++) {
+      if(clientAttrs[i].name === 'commonName') {
+        if( options.clientCertificateCN )
+          clientAttrs[i] = { name: 'commonName', value: options.clientCertificateCN };
+        else
+          clientAttrs[i] = { name: 'commonName', value: 'John Doe jdoe123' };
+      }
+    }
+
+    clientcert.setSubject(clientAttrs)
+
+    // Set the issuer to the parent key
+    clientcert.setIssuer(attrs)
+
+    clientcert.publicKey = clientkeys.publicKey
+
+    // Sign client cert with root cert
+    clientcert.sign(keys.privateKey)
+
+    pem.clientprivate = forge.pki.privateKeyToPem(clientkeys.privateKey);
+    pem.clientpublic = forge.pki.publicKeyToPem(clientkeys.publicKey);
+    pem.clientcert = forge.pki.certificateToPem(clientcert);
+
+    if (options.pkcs7) {
+      var clientp7 = forge.pkcs7.createSignedData()
+      clientp7.addCertificate(clientcert)
+      pem.clientpkcs7 = forge.pkcs7.messageToPem(clientp7)
+    }
+  }
+
   var caStore = forge.pki.createCaStore()
   caStore.addCertificate(cert)
 
