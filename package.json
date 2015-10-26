@@ -1,6 +1,6 @@
 {
   "name": "selfsigned",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
@@ -17,11 +17,16 @@
     "certificates"
   ],
   "author": "José F. Romaniello <jfromaniello@gmail.com> (http://joseoncode.com)",
-  "contirbutors": [
+  "contributors": [
     {
       "name": "Paolo Fragomeni",
       "email": "paolo@async.ly",
       "url": "http://async.ly"
+    },
+    {
+      "name": "Charles Bushong",
+      "email": "bushong1@gmail.com  ",
+      "url": "http://github.com/bushong1"
     }
   ],
   "license": "MIT",
