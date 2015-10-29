@@ -12,7 +12,8 @@ Generate a self signed x509 certificate from node.js.
 
 ```js
 var selfsigned = require('selfsigned');
-var pems = selfsigned.generate({ subj: '/CN=contoso.com', days: 365 });
+var attrs = [{ name: 'commonName', value: 'contoso.com' }];
+var pems = selfsigned.generate(attrs, { days: 365 });
 console.log(pems)
 ```
 
@@ -26,12 +27,18 @@ Will return the following like this:
 }
 ```
 
-## Configuration
-
-You can optionally specify a different algorithm:
+## Options
 
 ```js
-var pems = selfsigned.generate({ subj: '/CN=contoso.com', days: 365 }, { algorithm: 'sha256' });
+var pems = selfsigned.generate(null, {
+  keySize: 2048, // the size for the private key in bits (default: 1024)
+  days: 30, // how long till expiry of the signed certificate (default: 365)
+  algorithm: 'sha256', // sign the certificate with specified algorithm (default: 'sha1')
+  extensions: [{ name: 'basicConstraints', cA: true }], // certificate extensions array
+  pkcs7: true, // include PKCS#7 as part of the output (default: false)
+  clientCertificate: true, // generate client cert signed by the original key (default: false)
+  clientCertificateCN: 'jdoe' // client certificate's common name (default: 'John Doe jdoe123')
+});
 ```
 
 ### Generate Client Certificates
@@ -39,28 +46,24 @@ var pems = selfsigned.generate({ subj: '/CN=contoso.com', days: 365 }, { algorit
 If you are in an environment where servers require client certificates, you can generate client keys signed by the original (server) key.
 
 ```js
-var selfsigned = require('selfsigned');
 var pems = selfsigned.generate(null, { clientCertificate: true });
 console.log(pems)
 ```
-You can optionally specify a different algorithm:
-Which will generate the following:
+Will return the following like this:
 
 ```js
-{ private: '-----BEGIN RSA PRIVATE KEY-----\r\nMIICXQIBAAKBgQCgd/lGfk+0Yfgprcm0pJUiP6Hl3i4GDsGmstW3JBRsUNgE+RpT\r\nhLrDoxr0hvovXvdKLTUfRMkqLNVevv0EP6QP+2yG97FJ9IZb+DX3wHrTvMj3ngcf\r\nE5LpN632c8jK2TF9syozAuBnDiBmU27ys5mP4mf1OPmmZGfNADib85vWYQIDAQAB\r\nAoGASeESnlb3IUhdteqyS/3eP4dmZWuWaumOVM5PQONWl8vcuOVrLnqUdg/5EA24\r\nz+h8F+WaaIwFxeogTl/GI5edU5RrcMsX7yAJahGcV7NG8A1ajCCdlUXUJKKiahAI\r\nU3S9ej+8VCj93NwBtTgcTWDr24lyhZF7MCFpQ6qIoTFP58UCQQD0vx4etezlC5ba\r\nOWK7fLux8JhRsqOhhU7pMtnSc7kStCcXnkMMFgnCQOui5jh6CA9g1VeMGFppQ+00\r\ndh8NTEYrAkEAp9jUuOeXzobgV+f84V6eQ2FU+tB1EfsNSgSHIZRMsMUkVe+HOKed\r\nEyQzduuo8t/RUUmXKvGFtC6DU3t1cT37owJBAJnIOIm9b/NfO9M0uZfqwRkGfv7e\r\nizhjRfj7TaiRtBlPfzy04ZYHhuw61JSPqa7rv5Xtl0vcxXpdBv+utMYrRe8CQCnr\r\njbVgohmCtiU+W3ouF3jcpky+I38KJJeH6fgJAd5kXl7YI/2SXziYogHheaCvJagX\r\nqRmgmLQXqdT/0KUnxeECQQDR4c1sq8imgm82OpGElAZHxaSHQMwOWzo4E8E+XZCo\r\nV4tLzLjGKPwwdNTwGK+oxD3P7Qy1klnAowqj/URGkHE3\r\n-----END RSA PRIVATE KEY-----\r\n',
-  public: '-----BEGIN PUBLIC KEY-----\r\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCgd/lGfk+0Yfgprcm0pJUiP6Hl\r\n3i4GDsGmstW3JBRsUNgE+RpThLrDoxr0hvovXvdKLTUfRMkqLNVevv0EP6QP+2yG\r\n97FJ9IZb+DX3wHrTvMj3ngcfE5LpN632c8jK2TF9syozAuBnDiBmU27ys5mP4mf1\r\nOPmmZGfNADib85vWYQIDAQAB\r\n-----END PUBLIC KEY-----\r\n',
-    cert: '-----BEGIN CERTIFICATE-----\r\nMIICjTCCAfagAwIBAgIBATANBgkqhkiG9w0BAQUFADBpMRQwEgYDVQQDEwtleGFt\r\ncGxlLm9yZzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYDVQQH\r\nEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MB4XDTE1\r\nMTAyNTEzNTIwNFoXDTE2MTAyNTEzNTIwNFowaTEUMBIGA1UEAxMLZXhhbXBsZS5v\r\ncmcxCzAJBgNVBAYTAlVTMREwDwYDVQQIEwhWaXJnaW5pYTETMBEGA1UEBxMKQmxh\r\nY2tzYnVyZzENMAsGA1UEChMEVGVzdDENMAsGA1UECxMEVGVzdDCBnzANBgkqhkiG\r\n9w0BAQEFAAOBjQAwgYkCgYEAoHf5Rn5PtGH4Ka3JtKSVIj+h5d4uBg7BprLVtyQU\r\nbFDYBPkaU4S6w6Ma9Ib6L173Si01H0TJKizVXr79BD+kD/tshvexSfSGW/g198B6\r\n07zI954HHxOS6Tet9nPIytkxfbMqMwLgZw4gZlNu8rOZj+Jn9Tj5pmRnzQA4m/Ob\r\n1mECAwEAAaNFMEMwDAYDVR0TBAUwAwEB/zALBgNVHQ8EBAMCAvQwJgYDVR0RBB8w\r\nHYYbaHR0cDovL2V4YW1wbGUub3JnL3dlYmlkI21lMA0GCSqGSIb3DQEBBQUAA4GB\r\nAA508xX8hPhSMcOvgPznM80On0IXBTB6NlnAGd2I89mYnNX2b7/vBt83xCvwcxwo\r\nVaksTm6JbrlPWQ9hQESSkjsXGOJuGQePndKA7z4NwlVTdNyXupAm+zfrYRguajij\r\n3xXyY1ulsjTHhRaFP8fh49rrbAo7RB9D6fydNzHaqLz3\r\n-----END CERTIFICATE-----\r\n',
-      clientprivate: '-----BEGIN RSA PRIVATE KEY-----\r\nMIICXAIBAAKBgQC1EiQnN9GgPPOP5vm5XtJT1pQ7xeTI8/gTaGrCIV49HFWfVQ0h\r\nNVDbuhcKxTFlmnQLWolIxrSwRT5+T+UMiyrvMrErgQE2Tz/qbK7K+5Yl1yu2P39D\r\njdKwmIfBfacWisLxCE53/0WkMD+3uFu+h36Be0FWb+xmQuPHScQ0R1UbBQIDAQAB\r\nAoGAMUjEyl/pEMJGUQ6/PfNPMD6hjjto8EFnbnDnTfujGOMTcxDFSBqo7YWTK/1M\r\nWqlVmJmF8GcVWz0dq2e3olhm0MsOb+AWUsPhPTryXDnZLoJmZpyHYakLP2k7B3I7\r\nMmV2T7QNZY2d0THoAZ8tkO337LGuzZiuALa7Ix/fJGyJiykCQQDjH5+UZwcko/7T\r\nyQ/c2fHV0O1Sk3txyaVUPLB3QHcFBZRQaTIPzyjD6YITpy4+oE8iukZrlkrl+Hua\r\nCQp8d8+fAkEAzBealXUz7Z2ZC6DT1ISv1cVQpcRXYzveve3jOdsPrvJcBjWs4LCf\r\nTj0wACn8L14dirxnFHHBoKjogP/JjoDC2wJAeTcqcwidjlecLCnVtnf3ErdjwbuG\r\nmY8WFqQhRjP4kYyNwHC0UC2uwwh/7L8/9hqWwaEK7maS6LO6O9Zxa0aCXwJAabG/\r\nqK8t2VzIqbD8gw7EUR0CixaHeyjCTfIovwmnsZ5p8f1SLnrJxacCeNNFevJusi6n\r\n43qWIDHZVxUguOAOCQJBAIU/FDEVIc8h/mp2I5vufsMpYGsAMdMh03Wdg3dhxUaT\r\nlOXVzQehotFxyDayyyIr/S8V/SlG0nM7g4UJhKVQzbM=\r\n-----END RSA PRIVATE KEY-----\r\n',
-        clientpublic: '-----BEGIN PUBLIC KEY-----\r\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC1EiQnN9GgPPOP5vm5XtJT1pQ7\r\nxeTI8/gTaGrCIV49HFWfVQ0hNVDbuhcKxTFlmnQLWolIxrSwRT5+T+UMiyrvMrEr\r\ngQE2Tz/qbK7K+5Yl1yu2P39DjdKwmIfBfacWisLxCE53/0WkMD+3uFu+h36Be0FW\r\nb+xmQuPHScQ0R1UbBQIDAQAB\r\n-----END PUBLIC KEY-----\r\n',
-          clientcert: '-----BEGIN CERTIFICATE-----\r\nMIICSzCCAbSgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBpMRQwEgYDVQQDEwtleGFt\r\ncGxlLm9yZzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYDVQQH\r\nEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MB4XDTE1\r\nMTAyNTEzNTIwNFoXDTE2MTAyNTEzNTIwNFowbjEZMBcGA1UEAxMQSm9obiBEb2Ug\r\namRvZTEyMzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYDVQQH\r\nEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MIGfMA0G\r\nCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC1EiQnN9GgPPOP5vm5XtJT1pQ7xeTI8/gT\r\naGrCIV49HFWfVQ0hNVDbuhcKxTFlmnQLWolIxrSwRT5+T+UMiyrvMrErgQE2Tz/q\r\nbK7K+5Yl1yu2P39DjdKwmIfBfacWisLxCE53/0WkMD+3uFu+h36Be0FWb+xmQuPH\r\nScQ0R1UbBQIDAQABMA0GCSqGSIb3DQEBBQUAA4GBABvI/e+wpprXPTGp72SnoVPB\r\nKJ0AjZt2kYl69xl4KWw/PqN292l6Km/kkTbaPcG9QTjEyfYGCU73bgIp1htBPFcz\r\nssaYLXHtWxkTF6fYSgdR2uJFTWL0BVvr0x4ZS+7kyB7w82igqfL4NTP1XexcsqUx\r\n286cvNgatOWUjJ/Zr3jj\r\n-----END CERTIFICATE-----\r\n' }
+{ private: '-----BEGIN RSA PRIVATE KEY-----\r\nMIICXQIBAAKBgQDLg/kS4dCPVu96sbK6MQuUPmhqnF8SeBXVHH18h+0BTj7HqnrA\r\nA75hNVIiSLTChvpzQ0qi2Ju7O2ESUOdx7cvGiftGuZLiI8uL2HVlYuX+wQTIoRHx\r\n9nxv56TIiqnPg5d05vSTLXoiJg5uac3a6+4vnhhTo0XRRXVVboZsfNpuGQIDAQAB\r\nAoGAfhCd9QhUPLZJWeNBJvzCg221GHUMn1Arlfsz8DPyp+BkGyKLLu4iu+xfmEUZ\r\nU3ZxJX0FeqJatTwvAT2EYJpAovx+F37PWFTLAS6T57WI1O5Lj1pTIKVkLrasNQgF\r\nl6qFD3cvEtCZve4LiwDoJ52FO2OtcDcMJ0r2oqbCXSDIlAECQQDnkkxKcTejBZGH\r\nyYEXG9hAznnEZ63LLzlHHF2cIPfxT+9826Wm0IzBxn8Wr4hcAbNx3bVKgsU9p7xA\r\nfKnSqObhAkEA4PwCjPQqxFpiYUmNt7htb8nCEvUDD/QSDyxAH/uJzfr6gOJOD5nT\r\n5gZYblC+CCMDkgDUpro6oATNyeRNoU3GOQJBANdaW26DWZ1WqV9hCpcGAxdJrT30\r\nuVASq66w93Ehy9LzZqFz1tqKacwvH7NmLGZ8AngrGdSgRnOvEMfb50aMYqECQDcG\r\nzCTnbzJZHOjIkaXWsMV/pjz2ugoD2wrk+sYXwoujj/NH5mnAaOhAsw5AJ0pcLfpe\r\nw6QHtmD+68ouUaJbIFkCQQDeu0AXAp6Kbk6570i2DpGUSnkRdGCGS+3ekqqJUpE7\r\nfVUSx1nCF1sPD0p+pO8Rj3i87iI4MlblQRm/wVkrkjiR\r\n-----END RSA PRIVATE KEY-----\r\n',
+  public: '-----BEGIN PUBLIC KEY-----\r\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLg/kS4dCPVu96sbK6MQuUPmhq\r\nnF8SeBXVHH18h+0BTj7HqnrAA75hNVIiSLTChvpzQ0qi2Ju7O2ESUOdx7cvGiftG\r\nuZLiI8uL2HVlYuX+wQTIoRHx9nxv56TIiqnPg5d05vSTLXoiJg5uac3a6+4vnhhT\r\no0XRRXVVboZsfNpuGQIDAQAB\r\n-----END PUBLIC KEY-----\r\n',
+  cert: '-----BEGIN CERTIFICATE-----\r\nMIIClTCCAf6gAwIBAgIJdMZqoEeGMVYKMA0GCSqGSIb3DQEBBQUAMGkxFDASBgNV\r\nBAMTC2V4YW1wbGUub3JnMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWEx\r\nEzARBgNVBAcTCkJsYWNrc2J1cmcxDTALBgNVBAoTBFRlc3QxDTALBgNVBAsTBFRl\r\nc3QwHhcNMTUxMDI5MTMwNjA1WhcNMTYxMDI4MTMwNjA1WjBpMRQwEgYDVQQDEwtl\r\neGFtcGxlLm9yZzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYD\r\nVQQHEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MIGf\r\nMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLg/kS4dCPVu96sbK6MQuUPmhqnF8S\r\neBXVHH18h+0BTj7HqnrAA75hNVIiSLTChvpzQ0qi2Ju7O2ESUOdx7cvGiftGuZLi\r\nI8uL2HVlYuX+wQTIoRHx9nxv56TIiqnPg5d05vSTLXoiJg5uac3a6+4vnhhTo0XR\r\nRXVVboZsfNpuGQIDAQABo0UwQzAMBgNVHRMEBTADAQH/MAsGA1UdDwQEAwIC9DAm\r\nBgNVHREEHzAdhhtodHRwOi8vZXhhbXBsZS5vcmcvd2ViaWQjbWUwDQYJKoZIhvcN\r\nAQEFBQADgYEAj1Yyyb0R9KRFjIWNFi6RErB/riWylW4CdOK1hOyJZ+VRBWeYLKfX\r\ni///V+tqRvLlYY5x5DnrjXbDjBy0CZuN/J772/Srgp7Nl5cn92zynMJK1q4MEEs3\r\nAE/FO85R0HbGEp+IrwUwDOLR6omBFVdh1EUOTcQU2jLZNbWvLDiWbDo=\r\n-----END CERTIFICATE-----\r\n',
+  clientprivate: '-----BEGIN RSA PRIVATE KEY-----\r\nMIICWwIBAAKBgQDjR5FrrdZ1jirqkx3KMPnGjrcObj/vmztWTEZ1kX6gTskQugJU\r\noxktzwDZza4jYODC6Ud2jouFLWeAi5BDSAeLwAQb951qVD9zVsmQ+63V/mvSJUoj\r\nigwj7YjcxyReJ17F0YgjceqrkZaPM8YRo8h1fj1JdPc4ZOUgA5ASZ0h2ewIDAQAB\r\nAoGAfB5DbjibG8ut6Di7VgX1AdhCY+EVjXaKqxAwklgIfOdJqpbKWwpO39NiNY+7\r\nf5qSZB8dZcNmsi4fjfWprPSTGVkk1Qp2uibtFS4MhbLEeyy4cgZfMIBQY+HD0Asf\r\n1NU7WTY5QfzgH3HAKuWpUEWdar/jE+hDPA+wnsMg+TgGARECQQDzlc+5WA9JsG9f\r\nwNRzhMGRxDP4QLmL0iLWupF4BMP/k4OLMjDtzWl725WJ4FjCzML7mSmkWWe/P8f5\r\nwrbR+e8lAkEA7t0CEsiIw8BE55YMuGIz5xI0QDnuwNWmCEmq6+ZziW3L+EuAr1S4\r\nDORqBYm5DuRvBWkWE9Sld0a8vNqWh58tHwJAP1ZYEhicuQuAmkRYucTuVEnRPZ8O\r\n4BV+65jNlIigskcYMEyXvm3oHMWnJ5fHXLfDh4p28n4w5ODfzcjcotK7ZQJAE7bX\r\n8fbtGsLmrPp8aEdqozqkZ1ygsPexMWPrIHcvt/sA56hLoazrV90ORxC73lfKNfcb\r\nZF2bnoGPGEMuQ1lG3wJAPnHysm3DgbSHZQiXWMjF4YDRRV2AeOqX1fmlSeMErwdj\r\ncwIs+ikIBnOwUOh6liJ7yK1YnckDTZTOfUDyG+vdFQ==\r\n-----END RSA PRIVATE KEY-----\r\n',
+  clientpublic: '-----BEGIN PUBLIC KEY-----\r\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDjR5FrrdZ1jirqkx3KMPnGjrcO\r\nbj/vmztWTEZ1kX6gTskQugJUoxktzwDZza4jYODC6Ud2jouFLWeAi5BDSAeLwAQb\r\n951qVD9zVsmQ+63V/mvSJUojigwj7YjcxyReJ17F0YgjceqrkZaPM8YRo8h1fj1J\r\ndPc4ZOUgA5ASZ0h2ewIDAQAB\r\n-----END PUBLIC KEY-----\r\n',
+  clientcert: '-----BEGIN CERTIFICATE-----\r\nMIICSzCCAbSgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBpMRQwEgYDVQQDEwtleGFt\r\ncGxlLm9yZzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYDVQQH\r\nEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MB4XDTE1\r\nMTAyOTEzMDYwNVoXDTE2MTAyOTEzMDYwNVowbjEZMBcGA1UEAxMQSm9obiBEb2Ug\r\namRvZTEyMzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRMwEQYDVQQH\r\nEwpCbGFja3NidXJnMQ0wCwYDVQQKEwRUZXN0MQ0wCwYDVQQLEwRUZXN0MIGfMA0G\r\nCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDjR5FrrdZ1jirqkx3KMPnGjrcObj/vmztW\r\nTEZ1kX6gTskQugJUoxktzwDZza4jYODC6Ud2jouFLWeAi5BDSAeLwAQb951qVD9z\r\nVsmQ+63V/mvSJUojigwj7YjcxyReJ17F0YgjceqrkZaPM8YRo8h1fj1JdPc4ZOUg\r\nA5ASZ0h2ewIDAQABMA0GCSqGSIb3DQEBBQUAA4GBACOUglBxJ80jzR3DSSMrgRav\r\n7deKUPShEPC3tbVrc3LHPGpCEJUC309aK2mbMwz2jX78tr/ezePELKbyRggUvVgN\r\nB0XdIQkpR9X4mPdtFYkMiWKNVYKd79r0kolprgFPryhT3jsICIOnwE1Ur23Q+Fk2\r\nnizRS0HY4Q25JLCmsWWy\r\n-----END CERTIFICATE-----\r\n' }
 ```
-var pems = selfsigned.generate({ subj: '/CN=contoso.com', days: 365 }, { algorithm: 'sha256' });
-To override the default client CN of `john doe jdoe123`, add another option for clientCertificateCN:
+
+To override the default client CN of `john doe jdoe123`, add another option for `clientCertificateCN`:
 
 ```js
-var selfsigned = require('selfsigned');
-var pems = selfsigned.generate(null, { clientCertificate: true, clientCertificateCN: "FooBar" });
-console.log(pems)
+var pems = selfsigned.generate(null, { clientCertificate: true, clientCertificateCN: 'FooBar' });
 ```
 
 ## License
