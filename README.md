@@ -17,6 +17,14 @@ var pems = selfsigned.generate(attrs, { days: 365 });
 console.log(pems)
 ```
 
+#### Async
+
+```js
+selfsigned.generate(attrs, { days: 365 }, function (err, pems) {
+  console.log(pems)
+});
+```
+
 Will return the following like this:
 
 ```js
