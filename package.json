@@ -4,7 +4,7 @@
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
-    "test": "node ./test/tests.js"
+    "test": "mocha -t 5000"
   },
   "repository": {
     "type": "git",
@@ -32,5 +32,8 @@
   "license": "MIT",
   "dependencies": {
     "node-forge": "~0.2.0"
+  },
+  "devDependencies": {
+    "mocha": "^1.20.1"
   }
 }
