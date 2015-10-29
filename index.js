@@ -13,10 +13,10 @@ function getAlgorithm(key) {
 
 exports.generate = function generate(attrs, options) {
   options = options || {};
-  var keys = forge.pki.rsa.generateKeyPair(1024);
+  var keys = forge.pki.rsa.generateKeyPair(options.keySize || 1024);
   var cert = forge.pki.createCertificate();
 
-  cert.serialNumber = '01';
+  cert.serialNumber = forge.util.bytesToHex(forge.random.getBytesSync(9)); // the serial number can be decimal or hex (if preceded by 0x)
   cert.validity.notBefore = new Date();
   cert.validity.notAfter = new Date();
   cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365));
@@ -44,7 +44,9 @@ exports.generate = function generate(attrs, options) {
   cert.setSubject(attrs)
   cert.setIssuer(attrs)
 
-  cert.setExtensions([{
+  cert.publicKey = keys.publicKey
+
+  cert.setExtensions(options.extensions || [{
     name: 'basicConstraints',
     cA: true
   }, {
@@ -61,8 +63,6 @@ exports.generate = function generate(attrs, options) {
       value: 'http://example.org/webid#me'
     }]
   }])
-
-  cert.publicKey = keys.publicKey
 
   cert.sign(keys.privateKey, getAlgorithm(options && options.algorithm))
 
