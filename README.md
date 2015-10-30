@@ -49,6 +49,8 @@ var pems = selfsigned.generate(null, {
 });
 ```
 
+> You can avoid key pair generation specifying your own keys (`{ keyPair: { publicKey: '-----BEGIN PUBLIC KEY-----...', privateKey: '-----BEGIN RSA PRIVATE KEY-----...' }`)
+
 ### Generate Client Certificates
 
 If you are in an environment where servers require client certificates, you can generate client keys signed by the original (server) key.

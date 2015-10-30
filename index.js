@@ -160,6 +160,10 @@ exports.generate = function generate(attrs, options, done) {
     });
   }
 
-  var keyPair = forge.pki.rsa.generateKeyPair(keySize);
+  var keyPair = options.keyPair ? {
+    privateKey: forge.pki.privateKeyFromPem(options.keyPair.privateKey),
+    publicKey: forge.pki.publicKeyFromPem(options.keyPair.publicKey)
+  } : forge.pki.rsa.generateKeyPair(keySize);
+  
   return generatePem(keyPair);
 };
