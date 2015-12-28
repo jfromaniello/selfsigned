@@ -1,11 +1,23 @@
 var forge = require('node-forge');
-var fs = require('fs');
+
+// a hexString is considered negative if it's most significant bit is 1
+// because serial numbers use ones' complement notation
+// this RFC in section 4.1.2.2 requires serial numbers to be positive
+// http://www.ietf.org/rfc/rfc5280.txt
+function toPositiveHex(hexString){
+  var mostSiginficativeHexAsInt = parseInt(hexString[0], 16);
+  if (mostSiginficativeHexAsInt < 8){
+    return hexString;
+  }
+
+  mostSiginficativeHexAsInt -= 8;
+  return mostSiginficativeHexAsInt.toString() + hexString.substring(1);
+}
 
 function getAlgorithm(key) {
   switch (key) {
     case 'sha256':
       return forge.md.sha256.create();
-    case 'sha1':
     default:
       return forge.md.sha1.create();
   }
@@ -25,7 +37,8 @@ exports.generate = function generate(attrs, options, done) {
   var generatePem = function (keyPair) {
     var cert = forge.pki.createCertificate();
 
-    cert.serialNumber = forge.util.bytesToHex(forge.random.getBytesSync(9)); // the serial number can be decimal or hex (if preceded by 0x)
+    cert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9))); // the serial number can be decimal or hex (if preceded by 0x)
+
     cert.validity.notBefore = new Date();
     cert.validity.notAfter = new Date();
     cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365));
@@ -90,7 +103,7 @@ exports.generate = function generate(attrs, options, done) {
     if (options && options.clientCertificate) {
       var clientkeys = forge.pki.rsa.generateKeyPair(1024);
       var clientcert = forge.pki.createCertificate();
-      clientcert.serialNumber = forge.util.bytesToHex(forge.random.getBytesSync(9));
+      clientcert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9)));
       clientcert.validity.notBefore = new Date();
       clientcert.validity.notAfter = new Date();
       clientcert.validity.notAfter.setFullYear(clientcert.validity.notBefore.getFullYear() + 1);
@@ -164,6 +177,6 @@ exports.generate = function generate(attrs, options, done) {
     privateKey: forge.pki.privateKeyFromPem(options.keyPair.privateKey),
     publicKey: forge.pki.publicKeyFromPem(options.keyPair.publicKey)
   } : forge.pki.rsa.generateKeyPair(keySize);
-  
+
   return generatePem(keyPair);
 };
