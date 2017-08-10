@@ -9,8 +9,8 @@ describe('generate', function () {
 
   it('should work without attrs/options', function (done) {
     var pems = generate();
-
     assert.ok(!!pems.private, 'has a private key');
+    assert.ok(!!pems.fingerprint, 'has fingerprint');
     assert.ok(!!pems.public, 'has a public key');
     assert.ok(!!pems.cert, 'has a certificate');
     assert.ok(!pems.pkcs7, 'should not include a pkcs7 by default');
