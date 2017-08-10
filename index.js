@@ -100,7 +100,7 @@ exports.generate = function generate(attrs, options, done) {
       private:     forge.pki.privateKeyToPem(keyPair.privateKey),
       public:      forge.pki.publicKeyToPem(keyPair.publicKey),
       cert:        forge.pki.certificateToPem(cert),
-      fingerprint,
+      fingerprint: fingerprint,
     };
 
     if (options && options.pkcs7) {
