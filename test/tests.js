@@ -37,31 +37,31 @@ describe('generate', function () {
 
     assert.ok(!!pems.pkcs7, 'has a pkcs7');
 
-		try {
-			fs.unlinkSync('/tmp/tmp.pkcs7');
-		} catch (er) {}
+    try {
+      fs.unlinkSync('/tmp/tmp.pkcs7');
+    } catch (er) {}
 
-		fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
-		exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
-			if (err) {
-				return done(err);
-			}
+    fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
+    exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
+      if (err) {
+        return done(err);
+      }
 
-			const errorMessage = stderr.toString();
-			if (errorMessage.length) {
-				return done(new Error(errorMessage));
-			}
+      const errorMessage = stderr.toString();
+      if (errorMessage.length) {
+        return done(new Error(errorMessage));
+      }
 
-			const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
-			assert.equal(
-				`subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
-					pems.cert +
-					'\r\n',
-				expected
-			);
+      const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
+      assert.equal(
+        `subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
+          pems.cert +
+          '\r\n',
+        expected
+      );
 
-			done();
-		});
+      done();
+    });
   });
 
   it('should support sha1 algorithm', function (done) {
@@ -106,31 +106,31 @@ describe('generate', function () {
         if (err) done(err);
         assert.ok(!!pems.pkcs7, 'has a pkcs7');
 
-				try {
-					fs.unlinkSync('/tmp/tmp.pkcs7');
-				} catch (er) {}
+        try {
+          fs.unlinkSync('/tmp/tmp.pkcs7');
+        } catch (er) {}
 
-				fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
-				exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
-					if (err) {
-						return done(err);
-					}
+        fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
+        exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
+          if (err) {
+            return done(err);
+          }
 
-					const errorMessage = stderr.toString();
-					if (errorMessage.length) {
-						return done(new Error(errorMessage));
-					}
+          const errorMessage = stderr.toString();
+          if (errorMessage.length) {
+            return done(new Error(errorMessage));
+          }
 
-					const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
-					assert.equal(
-						`subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
-							pems.cert +
-							'\r\n',
-						expected
-					);
+          const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
+          assert.equal(
+            `subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
+              pems.cert +
+              '\r\n',
+            expected
+          );
 
-					done();
-				});
+          done();
+        });
       });
     });
 
