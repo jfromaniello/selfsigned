@@ -25,13 +25,13 @@
     },
     {
       "name": "Charles Bushong",
-      "email": "bushong1@gmail.com  ",
+      "email": "bushong1@gmail.com",
       "url": "http://github.com/bushong1"
     }
   ],
   "license": "MIT",
   "dependencies": {
-    "node-forge": "0.6.33"
+    "node-forge": "0.7.1"
   },
   "devDependencies": {
     "mocha": "^1.20.1"
