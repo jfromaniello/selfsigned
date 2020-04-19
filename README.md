@@ -35,6 +35,14 @@ Will return the following like this:
 }
 ```
 
+#### CLI
+
+```
+> selfsigned > <filename>
+```
+
+Will output to a file
+
 ## Attributes
 
 for attributes, please refer to: https://github.com/digitalbazaar/forge/blob/0.7.5/lib/x509.js#L129
