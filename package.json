@@ -3,6 +3,7 @@
   "version": "1.10.7",
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
+  "bin": "cli.js",
   "scripts": {
     "test": "mocha -t 5000"
   },
