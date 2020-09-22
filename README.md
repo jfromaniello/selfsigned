@@ -80,6 +80,47 @@ To override the default client CN of `john doe jdoe123`, add another option for 
 var pems = selfsigned.generate(null, { clientCertificate: true, clientCertificateCN: 'FooBar' });
 ```
 
+### Generate certificates signed by your own CA
+
+Provide your private certificate authority root certificate and private key in PEM format in `ca` option object (under `cert` and `private` keys respectively):
+
+```js
+const cert = selfsigned.generate(
+  [{ name: 'commonName',  value: 'example.com' }],
+  {
+    keySize: 2048,
+    ca: {
+      cert:    "-----BEGIN CERTIFICATE-----\r\n…\r\n-----END CERTIFICATE-----\r\n",
+      private: "-----BEGIN RSA PRIVATE KEY-----\r\n…\r\n-----END RSA PRIVATE KEY-----\r\n",
+    },
+    algorithm: 'sha256',
+    extensions: [
+      {
+        name: 'basicConstraints',
+        cA: false,
+      },
+      {
+        name: "keyUsage",
+        keyCertSign: false, // Must be set to false or Chrome won't accept this certificate otherwise
+        digitalSignature: true,
+        nonRepudiation: true,
+        keyEncipherment: true,
+        dataEncipherment: true,
+      },
+      {
+        name: "extKeyUsage",
+        serverAuth: true,
+        clientAuth: true,
+        codeSigning: true,
+        timeStamping: true,
+      },
+    ],
+  }
+)
+```
+
+And yes, you can generate CA certificate with selfsigned itself and just provide output of `selfsigned.generate` into `ca` option.
+
 ## License
 
 MIT
