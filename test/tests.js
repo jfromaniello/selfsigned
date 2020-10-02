@@ -1,14 +1,14 @@
-var assert  = require('assert');
-var forge   = require('node-forge');
-var fs      = require('fs');
-var exec    = require('child_process').exec;
+const assert = require('assert');
+const forge = require('node-forge');
+const fs = require('fs');
+const exec = require('child_process').exec;
 
 describe('generate', function () {
 
-  var generate = require('../index').generate;
+  const generate = require('../index').generate;
 
   it('should work without attrs/options', function (done) {
-    var pems = generate();
+    const pems = generate();
     assert.ok(!!pems.private, 'has a private key');
     assert.ok(!!pems.fingerprint, 'has fingerprint');
     assert.ok(!!pems.public, 'has a public key');
@@ -18,13 +18,13 @@ describe('generate', function () {
     assert.ok(!pems.clientprivate, 'should not include a client private key by default');
     assert.ok(!pems.clientpublic, 'should not include a client public key by default');
 
-    var caStore = forge.pki.createCaStore();
+    const caStore = forge.pki.createCaStore();
     caStore.addCertificate(pems.cert);
     done();
   });
 
   it('should generate client cert', function (done) {
-    var pems = generate(null, {clientCertificate: true});
+    const pems = generate(null, { clientCertificate: true });
 
     assert.ok(!!pems.clientcert, 'should include a client cert when requested');
     assert.ok(!!pems.clientprivate, 'should include a client private key when requested');
@@ -33,13 +33,13 @@ describe('generate', function () {
   });
 
   it('should include pkcs7', function (done) {
-    var pems = generate([{ name: 'commonName', value: 'contoso.com' }], {pkcs7: true});
+    const pems = generate([{ name: 'commonName', value: 'contoso.com' }], { pkcs7: true });
 
     assert.ok(!!pems.pkcs7, 'has a pkcs7');
 
     try {
       fs.unlinkSync('/tmp/tmp.pkcs7');
-    } catch (er) {}
+    } catch (er) { }
 
     fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
     exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
@@ -53,10 +53,10 @@ describe('generate', function () {
       }
 
       const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
-      assert.equal(
+      assert.strictEqual(
         `subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
-          pems.cert +
-          '\r\n',
+        pems.cert +
+        '\r\n',
         expected
       );
 
@@ -65,13 +65,13 @@ describe('generate', function () {
   });
 
   it('should support sha1 algorithm', function (done) {
-    var pems_sha1 = generate(null, { algorithm: 'sha1' });
+    const pems_sha1 = generate(null, { algorithm: 'sha1' });
     assert.ok(forge.pki.certificateFromPem(pems_sha1.cert).siginfo.algorithmOid === forge.pki.oids['sha1WithRSAEncryption'], 'can generate sha1 certs');
     done();
   });
 
   it('should support sha256 algorithm', function (done) {
-    var pems_sha256 = generate(null, { algorithm: 'sha256' });
+    const pems_sha256 = generate(null, { algorithm: 'sha256' });
     assert.ok(forge.pki.certificateFromPem(pems_sha256.cert).siginfo.algorithmOid === forge.pki.oids['sha256WithRSAEncryption'], 'can generate sha256 certs');
     done();
   });
@@ -92,7 +92,7 @@ describe('generate', function () {
     });
 
     it('should generate client cert', function (done) {
-      generate(null, {clientCertificate: true}, function (err, pems) {
+      generate(null, { clientCertificate: true }, function (err, pems) {
         if (err) done(err);
         assert.ok(!!pems.clientcert, 'should include a client cert when requested');
         assert.ok(!!pems.clientprivate, 'should include a client private key when requested');
@@ -102,13 +102,13 @@ describe('generate', function () {
     });
 
     it('should include pkcs7', function (done) {
-      generate([{ name: 'commonName', value: 'contoso.com' }], {pkcs7: true}, function (err, pems) {
+      generate([{ name: 'commonName', value: 'contoso.com' }], { pkcs7: true }, function (err, pems) {
         if (err) done(err);
         assert.ok(!!pems.pkcs7, 'has a pkcs7');
 
         try {
           fs.unlinkSync('/tmp/tmp.pkcs7');
-        } catch (er) {}
+        } catch (er) { }
 
         fs.writeFileSync('/tmp/tmp.pkcs7', pems.pkcs7);
         exec('openssl pkcs7 -print_certs -in /tmp/tmp.pkcs7', function (err, stdout, stderr) {
@@ -122,10 +122,10 @@ describe('generate', function () {
           }
 
           const expected = stdout.toString().replace(/\n/g, '\r\n'); //node-forge uses \r\n
-          assert.equal(
+          assert.strictEqual(
             `subject=/CN=contoso.com\r\nissuer=/CN=contoso.com\r\n` +
-              pems.cert +
-              '\r\n',
+            pems.cert +
+            '\r\n',
             expected
           );
 

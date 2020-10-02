@@ -1,12 +1,12 @@
-var forge = require('node-forge');
+const forge = require('node-forge');
 
 // a hexString is considered negative if it's most significant bit is 1
 // because serial numbers use ones' complement notation
 // this RFC in section 4.1.2.2 requires serial numbers to be positive
 // http://www.ietf.org/rfc/rfc5280.txt
-function toPositiveHex(hexString){
-  var mostSiginficativeHexAsInt = parseInt(hexString[0], 16);
-  if (mostSiginficativeHexAsInt < 8){
+function toPositiveHex(hexString) {
+  let mostSiginficativeHexAsInt = parseInt(hexString[0], 16);
+  if (mostSiginficativeHexAsInt < 8) {
     return hexString;
   }
 
@@ -34,8 +34,8 @@ exports.generate = function generate(attrs, options, done) {
 
   options = options || {};
 
-  var generatePem = function (keyPair) {
-    var cert = forge.pki.createCertificate();
+  const generatePem = function (keyPair) {
+    const cert = forge.pki.createCertificate();
 
     cert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9))); // the serial number can be decimal or hex (if preceded by 0x)
 
@@ -89,39 +89,39 @@ exports.generate = function generate(attrs, options, done) {
     cert.sign(keyPair.privateKey, getAlgorithm(options && options.algorithm));
 
     const fingerprint = forge.md.sha1
-                          .create()
-                          .update(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes())
-                          .digest()
-                          .toHex()
-                          .match(/.{2}/g)
-                          .join(':');
+      .create()
+      .update(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes())
+      .digest()
+      .toHex()
+      .match(/.{2}/g)
+      .join(':');
 
-    var pem = {
-      private:     forge.pki.privateKeyToPem(keyPair.privateKey),
-      public:      forge.pki.publicKeyToPem(keyPair.publicKey),
-      cert:        forge.pki.certificateToPem(cert),
+    const pem = {
+      private: forge.pki.privateKeyToPem(keyPair.privateKey),
+      public: forge.pki.publicKeyToPem(keyPair.publicKey),
+      cert: forge.pki.certificateToPem(cert),
       fingerprint: fingerprint,
     };
 
     if (options && options.pkcs7) {
-      var p7 = forge.pkcs7.createSignedData();
+      const p7 = forge.pkcs7.createSignedData();
       p7.addCertificate(cert);
       pem.pkcs7 = forge.pkcs7.messageToPem(p7);
     }
 
     if (options && options.clientCertificate) {
-      var clientkeys = forge.pki.rsa.generateKeyPair(1024);
-      var clientcert = forge.pki.createCertificate();
+      const clientkeys = forge.pki.rsa.generateKeyPair(1024);
+      const clientcert = forge.pki.createCertificate();
       clientcert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9)));
       clientcert.validity.notBefore = new Date();
       clientcert.validity.notAfter = new Date();
       clientcert.validity.notAfter.setFullYear(clientcert.validity.notBefore.getFullYear() + 1);
 
-      var clientAttrs = JSON.parse(JSON.stringify(attrs));
+      const clientAttrs = JSON.parse(JSON.stringify(attrs));
 
-      for(var i = 0; i < clientAttrs.length; i++) {
-        if(clientAttrs[i].name === 'commonName') {
-          if( options.clientCertificateCN )
+      for (let i = 0; i < clientAttrs.length; i++) {
+        if (clientAttrs[i].name === 'commonName') {
+          if (options.clientCertificateCN)
             clientAttrs[i] = { name: 'commonName', value: options.clientCertificateCN };
           else
             clientAttrs[i] = { name: 'commonName', value: 'John Doe jdoe123' };
@@ -143,13 +143,13 @@ exports.generate = function generate(attrs, options, done) {
       pem.clientcert = forge.pki.certificateToPem(clientcert);
 
       if (options.pkcs7) {
-        var clientp7 = forge.pkcs7.createSignedData();
+        const clientp7 = forge.pkcs7.createSignedData();
         clientp7.addCertificate(clientcert);
         pem.clientpkcs7 = forge.pkcs7.messageToPem(clientp7);
       }
     }
 
-    var caStore = forge.pki.createCaStore();
+    const caStore = forge.pki.createCaStore();
     caStore.addCertificate(cert);
 
     try {
@@ -161,14 +161,14 @@ exports.generate = function generate(attrs, options, done) {
           return true;
         });
     }
-    catch(ex) {
+    catch (ex) {
       throw new Error(ex);
     }
 
     return pem;
   };
 
-  var keySize = options.keySize || 1024;
+  const keySize = options.keySize || 1024;
 
   if (done) { // async scenario
     return forge.pki.rsa.generateKeyPair({ bits: keySize }, function (err, keyPair) {
@@ -182,7 +182,7 @@ exports.generate = function generate(attrs, options, done) {
     });
   }
 
-  var keyPair = options.keyPair ? {
+  const keyPair = options.keyPair ? {
     privateKey: forge.pki.privateKeyFromPem(options.keyPair.privateKey),
     publicKey: forge.pki.publicKeyFromPem(options.keyPair.publicKey)
   } : forge.pki.rsa.generateKeyPair(keySize);
