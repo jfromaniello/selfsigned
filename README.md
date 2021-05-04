@@ -37,7 +37,7 @@ Will return the following like this:
 
 ## Attributes
 
-for attributes, please refer to: https://github.com/digitalbazaar/forge/blob/0.7.5/lib/x509.js#L129
+for attributes, please refer to: https://github.com/digitalbazaar/forge/blob/master/lib/x509.js
 
 ## Options
 
