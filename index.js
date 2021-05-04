@@ -28,6 +28,7 @@ function getAlgorithm(key) {
  * @param {forge.pki.CertificateField[]} attrs Attributes used for subject and issuer.
  * @param {object} options
  * @param {number} [options.days=365] the number of days before expiration
+ * @param {number} [options.keySize=1024] the size for the private key in bits
  * @param {object} [options.extensions] additional extensions for the certificate
  * @param {string} [options.algorithm="sha1"] The signature algorithm sha256 or sha1
  * @param {boolean} [options.pkcs7=false] include PKCS#7 as part of the output
