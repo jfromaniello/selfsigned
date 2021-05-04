@@ -34,6 +34,7 @@
     "node-forge": "^0.10.0"
   },
   "devDependencies": {
-    "mocha": "^5.1.1"
+    "chai": "^4.3.4",
+    "mocha": "^8.3.2"
   }
 }
