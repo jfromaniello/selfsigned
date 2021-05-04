@@ -55,8 +55,8 @@ describe('generate', function () {
       const expected = stdout.toString();
       let [ subjectLine, ,issuerLine, , ...cert ] = expected.split(/\r?\n/);
       cert = cert.filter(c => c);
-      assert.match(subjectLine, /subject=CN\s?=\s?contoso.com/i);
-      assert.match(issuerLine, /issuer=CN\s?=\s?contoso.com/i);
+      assert.match(subjectLine, /subject=\/?CN\s?=\s?contoso.com/i);
+      assert.match(issuerLine, /issuer=\/?CN\s?=\s?contoso.com/i);
       assert.strictEqual(
         pems.cert,
         cert.join('\r\n') + '\r\n'
