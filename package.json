@@ -4,7 +4,7 @@
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -t 5000"
+    "test": "mocha -t 10000"
   },
   "repository": {
     "type": "git",

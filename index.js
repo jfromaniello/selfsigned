@@ -48,6 +48,8 @@ exports.generate = function generate(attrs, options, done) {
 
   options = options || {};
 
+  var keySize = options.keySize || 2048;
+
   var generatePem = function (keyPair) {
     var cert = forge.pki.createCertificate();
 
@@ -124,7 +126,7 @@ exports.generate = function generate(attrs, options, done) {
     }
 
     if (options && options.clientCertificate) {
-      var clientkeys = forge.pki.rsa.generateKeyPair(1024);
+      var clientkeys = forge.pki.rsa.generateKeyPair(keySize);
       var clientcert = forge.pki.createCertificate();
       clientcert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9)));
       clientcert.validity.notBefore = new Date();
@@ -181,8 +183,6 @@ exports.generate = function generate(attrs, options, done) {
 
     return pem;
   };
-
-  var keySize = options.keySize || 1024;
 
   if (done) { // async scenario
     return forge.pki.rsa.generateKeyPair({ bits: keySize }, function (err, keyPair) {
