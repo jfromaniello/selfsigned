@@ -1,7 +1,5 @@
 Generate a self signed x509 certificate from node.js.
 
-[![Build Status](https://travis-ci.org/jfromaniello/selfsigned.png)](https://travis-ci.org/jfromaniello/selfsigned)
-
 ## Install
 
 ```bash
