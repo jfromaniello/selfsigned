@@ -1,6 +1,6 @@
 {
   "name": "selfsigned",
-  "version": "1.10.12",
+  "version": "1.10.13",
   "description": "Generate self signed certificates private and public keys",
   "main": "index.js",
   "scripts": {
@@ -31,7 +31,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "node-forge": "^0.10.0"
+    "node-forge": "^1.2.0"
   },
   "devDependencies": {
     "chai": "^4.3.4",
