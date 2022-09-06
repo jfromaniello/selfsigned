@@ -14,7 +14,7 @@ declare interface SelfsignedOptions {
   /**
    * additional extensions for the certificate
    */
-  extensions?: string[]
+  extensions?: any[];
   /**
    * The signature algorithm sha256 or sha1
    * @default "sha1"
