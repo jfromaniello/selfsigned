@@ -124,7 +124,7 @@ exports.generate = function generate(attrs, options, done) {
     }
 
     if (options && options.clientCertificate) {
-      var clientkeys = forge.pki.rsa.generateKeyPair(1024);
+      var clientkeys = forge.pki.rsa.generateKeyPair(options.clientCertificateKeySize || 1024);
       var clientcert = forge.pki.createCertificate();
       clientcert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9)));
       clientcert.validity.notBefore = new Date();
