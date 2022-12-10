@@ -6,6 +6,13 @@ declare interface SelfsignedOptions {
    *
    * @default 365 */
   days?: number
+
+  /**
+   * The date before which the certificate should not be valid
+   *
+   * @default now */
+  notBeforeDate?: Date
+
   /**
    * the size for the private key in bits
    * @default 1024
