@@ -53,9 +53,10 @@ exports.generate = function generate(attrs, options, done) {
 
     cert.serialNumber = toPositiveHex(forge.util.bytesToHex(forge.random.getBytesSync(9))); // the serial number can be decimal or hex (if preceded by 0x)
 
-    cert.validity.notBefore = options.notBeforeDate || new Date();
-    cert.validity.notAfter = new Date();
-    cert.validity.notAfter.setDate(cert.validity.notBefore.getDate() + (options.days || 365));
+    var now = new Date();
+    cert.validity.notBefore = options.notBeforeDate || now;
+    cert.validity.notAfter = now;
+    cert.validity.notAfter.setDate(now.getDate() + (options.days || 365));
 
     attrs = attrs || [{
       name: 'commonName',
