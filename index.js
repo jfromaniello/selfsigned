@@ -59,6 +59,18 @@ exports.generate = function generate(attrs, options, done) {
     cert.validity.notAfter = notAfter;
     cert.validity.notAfter.setDate(notAfter.getDate() + (options.days || 365));
 
+    var caPrivateKey, caCert, issuerAttrs;
+    if (options && options.ca) {
+      caPrivateKey = forge.pki.privateKeyFromPem(options.ca.private),
+      caCert = forge.pki.certificateFromPem(options.ca.cert);
+      issuerAttrs = caCert.subject.attributes;
+    } else {
+      // Self-signed certificate: use our own key for signing
+      caPrivateKey = keyPair.privateKey;
+      caCert = cert;
+      issuerAttrs = attrs;
+    }
+
     attrs = attrs || [{
       name: 'commonName',
       value: 'example.org'
@@ -80,7 +92,7 @@ exports.generate = function generate(attrs, options, done) {
     }];
 
     cert.setSubject(attrs);
-    cert.setIssuer(attrs);
+    cert.setIssuer(issuerAttrs);
 
     cert.publicKey = keyPair.publicKey;
 
@@ -102,7 +114,7 @@ exports.generate = function generate(attrs, options, done) {
       }]
     }]);
 
-    cert.sign(keyPair.privateKey, getAlgorithm(options && options.algorithm));
+    cert.sign(caPrivateKey, getAlgorithm(options && options.algorithm));
 
     const fingerprint = forge.md.sha1
                           .create()
@@ -166,7 +178,7 @@ exports.generate = function generate(attrs, options, done) {
     }
 
     var caStore = forge.pki.createCaStore();
-    caStore.addCertificate(cert);
+    caStore.addCertificate(caCert);
 
     try {
       forge.pki.verifyCertificateChain(caStore, [cert],
