@@ -29,7 +29,7 @@ declare interface SelfsignedOptions {
    * generate client cert signed by the original key
    * @default false
    */
-  clientCertificate?: undefined
+  clientCertificate?: boolean
   /**
    * client certificate's common name
    * @default "John Doe jdoe123"
