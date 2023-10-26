@@ -42,6 +42,11 @@ declare interface SelfsignedOptions {
    * @default "John Doe jdoe123"
    */
   clientCertificateCN?: string
+  /**
+   * the size for the client private key in bits
+   * @default 1024
+   */
+   clientCertificateKeySize?: number
 }
 
 declare interface GenerateResult {
