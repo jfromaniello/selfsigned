@@ -43,6 +43,7 @@ for attributes, please refer to: https://github.com/digitalbazaar/forge/blob/mas
 var pems = selfsigned.generate(null, {
   keySize: 2048, // the size for the private key in bits (default: 1024)
   days: 30, // how long till expiry of the signed certificate (default: 365)
+  notBeforeDate: new Date(), // The date before which the certificate should not be valid (default: now)
   algorithm: 'sha256', // sign the certificate with specified algorithm (default: 'sha1')
   extensions: [{ name: 'basicConstraints', cA: true }], // certificate extensions array
   pkcs7: true, // include PKCS#7 as part of the output (default: false)
