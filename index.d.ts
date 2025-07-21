@@ -1,4 +1,22 @@
-import { pki } from 'node-forge'
+declare enum ASN1Class {
+    UNIVERSAL = 0x00,
+    APPLICATION = 0x40,
+    CONTEXT_SPECIFIC = 0x80,
+    PRIVATE = 0xc0,
+}
+
+interface CertificateFieldOptions {
+    name?: string | undefined;
+    type?: string | undefined;
+    shortName?: string | undefined;
+}
+
+interface CertificateField extends CertificateFieldOptions {
+    valueConstructed?: boolean | undefined;
+    valueTagClass?: ASN1Class | undefined;
+    value?: any[] | string | undefined;
+    extensions?: any[] | undefined;
+}
 
 declare interface SelfsignedOptions {
   /**
@@ -57,12 +75,12 @@ declare interface GenerateResult {
 }
 
 declare function generate(
-  attrs?: pki.CertificateField[],
+  attrs?: CertificateField[],
   opts?: SelfsignedOptions
 ): GenerateResult
 
 declare function generate(
-  attrs?: pki.CertificateField[],
+  attrs?: CertificateField[],
   opts?: SelfsignedOptions,
   /** Optional callback, if not provided the generation is synchronous */
   done?: (err: undefined | Error, result: GenerateResult) => any
