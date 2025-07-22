@@ -74,12 +74,12 @@ declare interface GenerateResult {
   fingerprint: string
 }
 
-declare function generate(
+export declare function generate(
   attrs?: CertificateField[],
   opts?: SelfsignedOptions
 ): GenerateResult
 
-declare function generate(
+export declare function generate(
   attrs?: CertificateField[],
   opts?: SelfsignedOptions,
   /** Optional callback, if not provided the generation is synchronous */
