@@ -78,6 +78,20 @@ describe('generate', function () {
     done();
   });
 
+  it('should default to 2048 bit keysize', function (done) {
+    var pems = generate();
+    var privateKey = forge.pki.privateKeyFromPem(pems.private);
+    assert.strictEqual(privateKey.n.bitLength(), 2048, 'default key size should be 2048 bits');
+    done();
+  });
+
+  it('should default to 2048 bit keysize for client certificate', function (done) {
+    var pems = generate(null, {clientCertificate: true});
+    var clientPrivateKey = forge.pki.privateKeyFromPem(pems.clientprivate);
+    assert.strictEqual(clientPrivateKey.n.bitLength(), 2048, 'default client key size should be 2048 bits');
+    done();
+  });
+
   describe('with callback', function () {
     it('should work without attrs/options', function (done) {
       generate(function (err, pems) {
@@ -149,6 +163,24 @@ describe('generate', function () {
       generate(null, { algorithm: 'sha256' }, function (err, pems_sha256) {
         if (err) done(err);
         assert.ok(forge.pki.certificateFromPem(pems_sha256.cert).siginfo.algorithmOid === forge.pki.oids['sha256WithRSAEncryption'], 'can generate sha256 certs');
+        done();
+      });
+    });
+
+    it('should default to 2048 bit keysize', function (done) {
+      generate(function (err, pems) {
+        if (err) done(err);
+        var privateKey = forge.pki.privateKeyFromPem(pems.private);
+        assert.strictEqual(privateKey.n.bitLength(), 2048, 'default key size should be 2048 bits');
+        done();
+      });
+    });
+
+    it('should default to 2048 bit keysize for client certificate', function (done) {
+      generate(null, {clientCertificate: true}, function (err, pems) {
+        if (err) done(err);
+        var clientPrivateKey = forge.pki.privateKeyFromPem(pems.clientprivate);
+        assert.strictEqual(clientPrivateKey.n.bitLength(), 2048, 'default client key size should be 2048 bits');
         done();
       });
     });
