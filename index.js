@@ -1,4 +1,8 @@
-var forge = require("node-forge");
+const { X509CertificateGenerator, X509Certificate, X509ChainBuilder } = require("@peculiar/x509");
+const nodeCrypto = require("crypto");
+
+// Use Node.js native webcrypto
+const crypto = nodeCrypto.webcrypto;
 
 // a hexString is considered negative if it's most significant bit is 1
 // because serial numbers use ones' complement notation
@@ -14,234 +18,289 @@ function toPositiveHex(hexString) {
   return mostSiginficativeHexAsInt.toString() + hexString.substring(1);
 }
 
-function getAlgorithm(key) {
+function getAlgorithmName(key) {
   switch (key) {
     case "sha256":
-      return forge.md.sha256.create();
+      return "SHA-256";
     case 'sha384':
-      return forge.md.sha384.create();
+      return "SHA-384";
     case 'sha512':
-      return forge.md.sha512.create();
+      return "SHA-512";
     default:
-      return forge.md.sha1.create();
+      return "SHA-1";
   }
 }
 
+function getSigningAlgorithm(key) {
+  const hashAlg = getAlgorithmName(key);
+  return {
+    name: "RSASSA-PKCS1-v1_5",
+    hash: hashAlg
+  };
+}
+
+// Convert attributes from node-forge format to X509 name format
+function convertAttributes(attrs) {
+  const nameMap = {
+    'commonName': 'CN',
+    'countryName': 'C',
+    'ST': 'ST',
+    'localityName': 'L',
+    'organizationName': 'O',
+    'OU': 'OU'
+  };
+
+  return attrs.map(attr => {
+    const key = attr.name || attr.shortName;
+    const oid = nameMap[key] || key;
+    return `${oid}=${attr.value}`;
+  }).join(', ');
+}
+
+// Convert PEM key to CryptoKey
+async function importPrivateKey(pemKey, algorithm) {
+  const pemContents = pemKey
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+
+  const binaryDer = Buffer.from(pemContents, 'base64');
+
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: getAlgorithmName(algorithm),
+    },
+    true,
+    ['sign']
+  );
+}
+
+async function importPublicKey(pemKey, algorithm) {
+  const pemContents = pemKey
+    .replace(/-----BEGIN PUBLIC KEY-----/, '')
+    .replace(/-----END PUBLIC KEY-----/, '')
+    .replace(/\s/g, '');
+
+  const binaryDer = Buffer.from(pemContents, 'base64');
+
+  return await crypto.subtle.importKey(
+    'spki',
+    binaryDer,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: getAlgorithmName(algorithm),
+    },
+    true,
+    ['verify']
+  );
+}
+
+async function generatePemAsync(keyPair, attrs, options) {
+  const { privateKey, publicKey } = keyPair;
+
+  // Generate serial number
+  const serialBytes = crypto.getRandomValues(new Uint8Array(9));
+  const serialHex = toPositiveHex(Buffer.from(serialBytes).toString('hex'));
+
+  // Set up dates
+  const notBefore = options.notBeforeDate || new Date();
+  const notAfter = new Date();
+  notAfter.setDate(notBefore.getDate() + (options.days || 365));
+
+  // Default attributes
+  attrs = attrs || [
+    {
+      name: "commonName",
+      value: "example.org",
+    },
+    {
+      name: "countryName",
+      value: "US",
+    },
+    {
+      shortName: "ST",
+      value: "Virginia",
+    },
+    {
+      name: "localityName",
+      value: "Blacksburg",
+    },
+    {
+      name: "organizationName",
+      value: "Test",
+    },
+    {
+      shortName: "OU",
+      value: "Test",
+    },
+  ];
+
+  const subjectName = convertAttributes(attrs);
+  const signingAlg = getSigningAlgorithm(options.algorithm);
+
+  // Generate certificate
+  const cert = await X509CertificateGenerator.createSelfSigned({
+    serialNumber: serialHex,
+    name: subjectName,
+    notBefore: notBefore,
+    notAfter: notAfter,
+    signingAlgorithm: signingAlg,
+    keys: {
+      privateKey: privateKey,
+      publicKey: publicKey
+    }
+  });
+
+  // Calculate fingerprint (SHA-1 hash of the certificate)
+  const certRaw = cert.rawData;
+  const fingerprintBuffer = await crypto.subtle.digest('SHA-1', certRaw);
+  const fingerprint = Buffer.from(fingerprintBuffer)
+    .toString('hex')
+    .match(/.{2}/g)
+    .join(':');
+
+  // Export keys to PEM
+  const privateKeyDer = await crypto.subtle.exportKey('pkcs8', privateKey);
+  const publicKeyDer = await crypto.subtle.exportKey('spki', publicKey);
+
+  const privatePem =
+    '-----BEGIN PRIVATE KEY-----\n' +
+    Buffer.from(privateKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
+    '\n-----END PRIVATE KEY-----\n';
+
+  const publicPem =
+    '-----BEGIN PUBLIC KEY-----\n' +
+    Buffer.from(publicKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
+    '\n-----END PUBLIC KEY-----\n';
+
+  const certPem = cert.toString('pem');
+
+  const pem = {
+    private: privatePem,
+    public: publicPem,
+    cert: certPem,
+    fingerprint: fingerprint,
+  };
+
+  // Client certificate support
+  if (options && options.clientCertificate) {
+    const clientKeyPair = await crypto.subtle.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: options.clientCertificateKeySize || 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: getAlgorithmName(options.algorithm || "sha1"),
+      },
+      true,
+      ["sign", "verify"]
+    );
+
+    const clientSerialBytes = crypto.getRandomValues(new Uint8Array(9));
+    const clientSerialHex = toPositiveHex(Buffer.from(clientSerialBytes).toString('hex'));
+
+    const clientNotBefore = new Date();
+    const clientNotAfter = new Date();
+    clientNotAfter.setFullYear(clientNotBefore.getFullYear() + 1);
+
+    const clientAttrs = JSON.parse(JSON.stringify(attrs));
+    for (let i = 0; i < clientAttrs.length; i++) {
+      if (clientAttrs[i].name === "commonName") {
+        clientAttrs[i] = {
+          name: "commonName",
+          value: options.clientCertificateCN || "John Doe jdoe123"
+        };
+      }
+    }
+
+    const clientSubjectName = convertAttributes(clientAttrs);
+    const issuerName = convertAttributes(attrs);
+
+    // Create client cert signed by root key
+    const clientCertRaw = await X509CertificateGenerator.create({
+      serialNumber: clientSerialHex,
+      subject: clientSubjectName,
+      issuer: issuerName,
+      notBefore: clientNotBefore,
+      notAfter: clientNotAfter,
+      signingAlgorithm: signingAlg,
+      publicKey: clientKeyPair.publicKey,
+      signingKey: privateKey // Sign with root private key
+    });
+
+    // Export client keys
+    const clientPrivateKeyDer = await crypto.subtle.exportKey('pkcs8', clientKeyPair.privateKey);
+    const clientPublicKeyDer = await crypto.subtle.exportKey('spki', clientKeyPair.publicKey);
+
+    pem.clientprivate =
+      '-----BEGIN PRIVATE KEY-----\n' +
+      Buffer.from(clientPrivateKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
+      '\n-----END PRIVATE KEY-----\n';
+
+    pem.clientpublic =
+      '-----BEGIN PUBLIC KEY-----\n' +
+      Buffer.from(clientPublicKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
+      '\n-----END PUBLIC KEY-----\n';
+
+    pem.clientcert = clientCertRaw.toString('pem');
+  }
+
+  // Verify certificate chain
+  const x509Cert = new X509Certificate(cert.rawData);
+  const chainBuilder = new X509ChainBuilder({
+    certificates: [x509Cert]
+  });
+
+  const chain = await chainBuilder.build(x509Cert);
+  if (chain.length === 0) {
+    throw new Error("Certificate could not be verified.");
+  }
+
+  return pem;
+}
+
 /**
+ * Generate a self-signed certificate (async)
  *
  * @param {CertificateField[]} attrs Attributes used for subject and issuer.
  * @param {object} options
  * @param {number} [options.days=365] the number of days before expiration
  * @param {number} [options.keySize=2048] the size for the private key in bits
  * @param {object} [options.extensions] additional extensions for the certificate
- * @param {string} [options.algorithm="sha1"] The signature algorithm sha256 or sha1
- * @param {boolean} [options.pkcs7=false] include PKCS#7 as part of the output
+ * @param {string} [options.algorithm="sha1"] The signature algorithm sha256, sha384, sha512 or sha1
  * @param {boolean} [options.clientCertificate=false] generate client cert signed by the original key
  * @param {string} [options.clientCertificateCN="John Doe jdoe123"] client certificate's common name
- * @param {function} [done] Optional callback, if not provided the generation is synchronous
- * @returns
+ * @returns {Promise<object>} Promise that resolves with certificate data
  */
-exports.generate = function generate(attrs, options, done) {
-  if (typeof attrs === "function") {
-    done = attrs;
-    attrs = undefined;
-  } else if (typeof options === "function") {
-    done = options;
-    options = {};
-  }
-
+exports.generate = async function generate(attrs, options) {
+  attrs = attrs || undefined;
   options = options || {};
 
-  var generatePem = function (keyPair) {
-    var cert = forge.pki.createCertificate();
+  const keySize = options.keySize || 2048;
 
-    cert.serialNumber = toPositiveHex(
-      forge.util.bytesToHex(forge.random.getBytesSync(9))
-    ); // the serial number can be decimal or hex (if preceded by 0x)
+  let keyPair;
 
-    cert.validity.notBefore = options.notBeforeDate || new Date();
-
-    var notAfter = new Date();
-    cert.validity.notAfter = notAfter;
-    cert.validity.notAfter.setDate(notAfter.getDate() + (options.days || 365));
-
-    attrs = attrs || [
-      {
-        name: "commonName",
-        value: "example.org",
-      },
-      {
-        name: "countryName",
-        value: "US",
-      },
-      {
-        shortName: "ST",
-        value: "Virginia",
-      },
-      {
-        name: "localityName",
-        value: "Blacksburg",
-      },
-      {
-        name: "organizationName",
-        value: "Test",
-      },
-      {
-        shortName: "OU",
-        value: "Test",
-      },
-    ];
-
-    cert.setSubject(attrs);
-    cert.setIssuer(attrs);
-
-    cert.publicKey = keyPair.publicKey;
-
-    cert.setExtensions(
-      options.extensions || [
-        {
-          name: "basicConstraints",
-          cA: true,
-        },
-        {
-          name: "keyUsage",
-          keyCertSign: true,
-          digitalSignature: true,
-          nonRepudiation: true,
-          keyEncipherment: true,
-          dataEncipherment: true,
-        },
-        {
-          name: "subjectAltName",
-          altNames: [
-            {
-              type: 6, // URI
-              value: "http://example.org/webid#me",
-            },
-          ],
-        },
-      ]
-    );
-
-    cert.sign(keyPair.privateKey, getAlgorithm(options && options.algorithm));
-
-    const fingerprint = forge.md.sha1
-      .create()
-      .update(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes())
-      .digest()
-      .toHex()
-      .match(/.{2}/g)
-      .join(":");
-
-    var pem = {
-      private: forge.pki.privateKeyToPem(keyPair.privateKey),
-      public: forge.pki.publicKeyToPem(keyPair.publicKey),
-      cert: forge.pki.certificateToPem(cert),
-      fingerprint: fingerprint,
+  if (options.keyPair) {
+    // Import existing key pair
+    keyPair = {
+      privateKey: await importPrivateKey(options.keyPair.privateKey, options.algorithm || "sha1"),
+      publicKey: await importPublicKey(options.keyPair.publicKey, options.algorithm || "sha1")
     };
-
-    if (options && options.pkcs7) {
-      var p7 = forge.pkcs7.createSignedData();
-      p7.addCertificate(cert);
-      pem.pkcs7 = forge.pkcs7.messageToPem(p7);
-    }
-
-    if (options && options.clientCertificate) {
-      var clientkeys = forge.pki.rsa.generateKeyPair(
-        options.clientCertificateKeySize || 2048
-      );
-      var clientcert = forge.pki.createCertificate();
-      clientcert.serialNumber = toPositiveHex(
-        forge.util.bytesToHex(forge.random.getBytesSync(9))
-      );
-      clientcert.validity.notBefore = new Date();
-      clientcert.validity.notAfter = new Date();
-      clientcert.validity.notAfter.setFullYear(
-        clientcert.validity.notBefore.getFullYear() + 1
-      );
-
-      var clientAttrs = JSON.parse(JSON.stringify(attrs));
-
-      for (var i = 0; i < clientAttrs.length; i++) {
-        if (clientAttrs[i].name === "commonName") {
-          if (options.clientCertificateCN)
-            clientAttrs[i] = {
-              name: "commonName",
-              value: options.clientCertificateCN,
-            };
-          else
-            clientAttrs[i] = { name: "commonName", value: "John Doe jdoe123" };
-        }
-      }
-
-      clientcert.setSubject(clientAttrs);
-
-      // Set the issuer to the parent key
-      clientcert.setIssuer(attrs);
-
-      clientcert.publicKey = clientkeys.publicKey;
-
-      // Sign client cert with root cert
-      clientcert.sign(keyPair.privateKey, getAlgorithm(options && options.algorithm));
-
-      pem.clientprivate = forge.pki.privateKeyToPem(clientkeys.privateKey);
-      pem.clientpublic = forge.pki.publicKeyToPem(clientkeys.publicKey);
-      pem.clientcert = forge.pki.certificateToPem(clientcert);
-
-      if (options.pkcs7) {
-        var clientp7 = forge.pkcs7.createSignedData();
-        clientp7.addCertificate(clientcert);
-        pem.clientpkcs7 = forge.pkcs7.messageToPem(clientp7);
-      }
-    }
-
-    var caStore = forge.pki.createCaStore();
-    caStore.addCertificate(cert);
-
-    try {
-      forge.pki.verifyCertificateChain(
-        caStore,
-        [cert],
-        function (vfd, depth, chain) {
-          if (vfd !== true) {
-            throw new Error("Certificate could not be verified.");
-          }
-          return true;
-        }
-      );
-    } catch (ex) {
-      throw new Error(ex);
-    }
-
-    return pem;
-  };
-
-  var keySize = options.keySize || 2048;
-
-  if (done) {
-    // async scenario
-    return forge.pki.rsa.generateKeyPair(
-      { bits: keySize },
-      function (err, keyPair) {
-        if (err) {
-          return done(err);
-        }
-
-        try {
-          return done(null, generatePem(keyPair));
-        } catch (ex) {
-          return done(ex);
-        }
-      }
+  } else {
+    // Generate new key pair
+    keyPair = await crypto.subtle.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: keySize,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: getAlgorithmName(options.algorithm || "sha1"),
+      },
+      true,
+      ["sign", "verify"]
     );
   }
 
-  var keyPair = options.keyPair
-    ? {
-        privateKey: forge.pki.privateKeyFromPem(options.keyPair.privateKey),
-        publicKey: forge.pki.publicKeyFromPem(options.keyPair.publicKey),
-      }
-    : forge.pki.rsa.generateKeyPair(keySize);
-
-  return generatePem(keyPair);
+  return await generatePemAsync(keyPair, attrs, options);
 };

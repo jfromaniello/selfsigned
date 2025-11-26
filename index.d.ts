@@ -33,7 +33,7 @@ declare interface SelfsignedOptions {
 
   /**
    * the size for the private key in bits
-   * @default 1024
+   * @default 2048
    */
   keySize?: number
   /**
@@ -41,7 +41,7 @@ declare interface SelfsignedOptions {
    */
   extensions?: any[];
   /**
-   * The signature algorithm sha256 or sha1
+   * The signature algorithm: sha256, sha384, sha512 or sha1
    * @default "sha1"
    */
   algorithm?: string
@@ -62,9 +62,16 @@ declare interface SelfsignedOptions {
   clientCertificateCN?: string
   /**
    * the size for the client private key in bits
-   * @default 1024
+   * @default 2048
    */
    clientCertificateKeySize?: number
+  /**
+   * existing key pair to use instead of generating new keys
+   */
+   keyPair?: {
+     privateKey: string
+     publicKey: string
+   }
 }
 
 declare interface GenerateResult {
@@ -72,16 +79,33 @@ declare interface GenerateResult {
   public: string
   cert: string
   fingerprint: string
+  pkcs7?: string
+  clientprivate?: string
+  clientpublic?: string
+  clientcert?: string
+  clientpkcs7?: string
 }
 
+/**
+ * Generate a self-signed certificate (async only)
+ *
+ * @param attrs Certificate attributes
+ * @param opts Generation options
+ * @returns Promise that resolves with certificate data
+ *
+ * @example
+ * ```typescript
+ * const pems = await generate();
+ *
+ * const pems = await generate([{ name: 'commonName', value: 'example.com' }]);
+ *
+ * const pems = await generate(null, {
+ *   keySize: 2048,
+ *   algorithm: 'sha256'
+ * });
+ * ```
+ */
 export declare function generate(
   attrs?: CertificateField[],
   opts?: SelfsignedOptions
-): GenerateResult
-
-export declare function generate(
-  attrs?: CertificateField[],
-  opts?: SelfsignedOptions,
-  /** Optional callback, if not provided the generation is synchronous */
-  done?: (err: undefined | Error, result: GenerateResult) => any
-): void
+): Promise<GenerateResult>
