@@ -72,6 +72,15 @@ declare interface SelfsignedOptions {
      privateKey: string
      publicKey: string
    }
+  /**
+   * CA certificate and key for signing (if not provided, generates self-signed)
+   */
+   ca?: {
+     /** CA private key in PEM format */
+     key: string
+     /** CA certificate in PEM format */
+     cert: string
+   }
 }
 
 declare interface GenerateResult {
@@ -87,7 +96,7 @@ declare interface GenerateResult {
 }
 
 /**
- * Generate a self-signed certificate (async only)
+ * Generate a certificate (async only)
  *
  * @param attrs Certificate attributes
  * @param opts Generation options
@@ -95,6 +104,7 @@ declare interface GenerateResult {
  *
  * @example
  * ```typescript
+ * // Self-signed certificate
  * const pems = await generate();
  *
  * const pems = await generate([{ name: 'commonName', value: 'example.com' }]);
@@ -102,6 +112,15 @@ declare interface GenerateResult {
  * const pems = await generate(null, {
  *   keySize: 2048,
  *   algorithm: 'sha256'
+ * });
+ *
+ * // CA-signed certificate
+ * const pems = await generate([{ name: 'commonName', value: 'localhost' }], {
+ *   algorithm: 'sha256',
+ *   ca: {
+ *     key: fs.readFileSync('/path/to/ca.key', 'utf8'),
+ *     cert: fs.readFileSync('/path/to/ca.crt', 'utf8')
+ *   }
  * });
  * ```
  */

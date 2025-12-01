@@ -46,7 +46,8 @@ const pems = await selfsigned.generate(null, {
   extensions: [{ name: 'basicConstraints', cA: true }], // certificate extensions array
   clientCertificate: true, // generate client cert signed by the original key (default: false)
   clientCertificateCN: 'jdoe', // client certificate's common name (default: 'John Doe jdoe123')
-  clientCertificateKeySize: 2048 // the size for the client private key in bits (default: 2048)
+  clientCertificateKeySize: 2048, // the size for the client private key in bits (default: 2048)
+  ca: { key: '...', cert: '...' } // CA key and cert for signing (default: self-signed)
 });
 ```
 
@@ -69,6 +70,59 @@ const pems = await selfsigned.generate(null, {
   }
 });
 ```
+
+### Signing with a CA
+
+You can generate certificates signed by an existing Certificate Authority instead of self-signed certificates. This is useful for development environments where you want browsers to trust your certificates.
+
+```js
+const fs = require('fs');
+const selfsigned = require('selfsigned');
+
+const pems = await selfsigned.generate([
+  { name: 'commonName', value: 'localhost' }
+], {
+  algorithm: 'sha256',
+  ca: {
+    key: fs.readFileSync('/path/to/ca.key', 'utf8'),
+    cert: fs.readFileSync('/path/to/ca.crt', 'utf8')
+  }
+});
+```
+
+The generated certificate will be signed by the provided CA and will include:
+- Subject Alternative Name (SAN) extension with DNS name matching the commonName
+- For `localhost`, an additional IP SAN for `127.0.0.1`
+- Key Usage: digitalSignature, keyEncipherment
+- Extended Key Usage: serverAuth, clientAuth
+
+#### Using with mkcert
+
+[mkcert](https://github.com/FiloSottile/mkcert) is a popular tool for creating locally-trusted development certificates. You can use its CA to sign certificates:
+
+```js
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+const selfsigned = require('selfsigned');
+
+// Get mkcert's CA root path
+const caroot = execSync('mkcert -CAROOT', { encoding: 'utf8' }).trim();
+
+const pems = await selfsigned.generate([
+  { name: 'commonName', value: 'localhost' }
+], {
+  algorithm: 'sha256',
+  ca: {
+    key: fs.readFileSync(path.join(caroot, 'rootCA-key.pem'), 'utf8'),
+    cert: fs.readFileSync(path.join(caroot, 'rootCA.pem'), 'utf8')
+  }
+});
+
+// Browsers will trust this certificate if `mkcert -install` was run
+```
+
+See [examples/https-server-mkcert.js](examples/https-server-mkcert.js) for a complete example.
 
 ## Attributes
 

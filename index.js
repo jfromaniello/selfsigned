@@ -1,4 +1,4 @@
-const { X509CertificateGenerator, X509Certificate, X509ChainBuilder } = require("@peculiar/x509");
+const { X509CertificateGenerator, X509Certificate, X509ChainBuilder, BasicConstraintsExtension, KeyUsagesExtension, KeyUsageFlags, ExtendedKeyUsageExtension, ExtendedKeyUsage, SubjectAlternativeNameExtension, GeneralName } = require("@peculiar/x509");
 const nodeCrypto = require("crypto");
 
 // Use Node.js native webcrypto
@@ -59,23 +59,45 @@ function convertAttributes(attrs) {
 
 // Convert PEM key to CryptoKey
 async function importPrivateKey(pemKey, algorithm) {
-  const pemContents = pemKey
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
+  // Support both PKCS#8 and PKCS#1 (RSA) formats
+  const pkcs8Match = pemKey.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
+  const rsaMatch = pemKey.match(/-----BEGIN RSA PRIVATE KEY-----([\s\S]*?)-----END RSA PRIVATE KEY-----/);
 
-  const binaryDer = Buffer.from(pemContents, 'base64');
-
-  return await crypto.subtle.importKey(
-    'pkcs8',
-    binaryDer,
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      hash: getAlgorithmName(algorithm),
-    },
-    true,
-    ['sign']
-  );
+  if (pkcs8Match) {
+    const pemContents = pkcs8Match[1].replace(/\s/g, '');
+    const binaryDer = Buffer.from(pemContents, 'base64');
+    return await crypto.subtle.importKey(
+      'pkcs8',
+      binaryDer,
+      {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: getAlgorithmName(algorithm),
+      },
+      true,
+      ['sign']
+    );
+  } else if (rsaMatch) {
+    // PKCS#1 RSA key - need to convert using Node.js crypto
+    const keyObject = nodeCrypto.createPrivateKey(pemKey);
+    const pkcs8Pem = keyObject.export({ type: 'pkcs8', format: 'pem' });
+    const pemContents = pkcs8Pem
+      .replace(/-----BEGIN PRIVATE KEY-----/, '')
+      .replace(/-----END PRIVATE KEY-----/, '')
+      .replace(/\s/g, '');
+    const binaryDer = Buffer.from(pemContents, 'base64');
+    return await crypto.subtle.importKey(
+      'pkcs8',
+      binaryDer,
+      {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: getAlgorithmName(algorithm),
+      },
+      true,
+      ['sign']
+    );
+  } else {
+    throw new Error('Unsupported private key format. Expected PKCS#8 or PKCS#1 RSA key.');
+  }
 }
 
 async function importPublicKey(pemKey, algorithm) {
@@ -98,7 +120,7 @@ async function importPublicKey(pemKey, algorithm) {
   );
 }
 
-async function generatePemAsync(keyPair, attrs, options) {
+async function generatePemAsync(keyPair, attrs, options, ca) {
   const { privateKey, publicKey } = keyPair;
 
   // Generate serial number
@@ -141,18 +163,54 @@ async function generatePemAsync(keyPair, attrs, options) {
   const subjectName = convertAttributes(attrs);
   const signingAlg = getSigningAlgorithm(options.algorithm);
 
-  // Generate certificate
-  const cert = await X509CertificateGenerator.createSelfSigned({
-    serialNumber: serialHex,
-    name: subjectName,
-    notBefore: notBefore,
-    notAfter: notAfter,
-    signingAlgorithm: signingAlg,
-    keys: {
-      privateKey: privateKey,
-      publicKey: publicKey
-    }
-  });
+  // Extract common name for SAN extension
+  const commonNameAttr = attrs.find(attr => attr.name === 'commonName' || attr.shortName === 'CN');
+  const commonName = commonNameAttr ? commonNameAttr.value : 'localhost';
+
+  // Build extensions array
+  const extensions = [
+    new BasicConstraintsExtension(false, undefined, true),
+    new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment, true),
+    new ExtendedKeyUsageExtension([ExtendedKeyUsage.serverAuth, ExtendedKeyUsage.clientAuth], false),
+    new SubjectAlternativeNameExtension([
+      { type: 'dns', value: commonName },
+      ...(commonName === 'localhost' ? [{ type: 'ip', value: '127.0.0.1' }] : [])
+    ], false)
+  ];
+
+  let cert;
+
+  if (ca) {
+    // Generate certificate signed by CA
+    const caCert = new X509Certificate(ca.cert);
+    const caPrivateKey = await importPrivateKey(ca.key, options.algorithm || "sha256");
+
+    cert = await X509CertificateGenerator.create({
+      serialNumber: serialHex,
+      subject: subjectName,
+      issuer: caCert.subject,
+      notBefore: notBefore,
+      notAfter: notAfter,
+      signingAlgorithm: signingAlg,
+      publicKey: publicKey,
+      signingKey: caPrivateKey,
+      extensions: extensions
+    });
+  } else {
+    // Generate self-signed certificate
+    cert = await X509CertificateGenerator.createSelfSigned({
+      serialNumber: serialHex,
+      name: subjectName,
+      notBefore: notBefore,
+      notAfter: notAfter,
+      signingAlgorithm: signingAlg,
+      keys: {
+        privateKey: privateKey,
+        publicKey: publicKey
+      },
+      extensions: extensions
+    });
+  }
 
   // Calculate fingerprint (SHA-1 hash of the certificate)
   const certRaw = cert.rawData;
@@ -249,8 +307,16 @@ async function generatePemAsync(keyPair, attrs, options) {
 
   // Verify certificate chain
   const x509Cert = new X509Certificate(cert.rawData);
+  const certificates = [x509Cert];
+
+  // If CA-signed, include CA cert in the chain for verification
+  if (ca) {
+    const caCert = new X509Certificate(ca.cert);
+    certificates.push(caCert);
+  }
+
   const chainBuilder = new X509ChainBuilder({
-    certificates: [x509Cert]
+    certificates: certificates
   });
 
   const chain = await chainBuilder.build(x509Cert);
@@ -262,9 +328,9 @@ async function generatePemAsync(keyPair, attrs, options) {
 }
 
 /**
- * Generate a self-signed certificate (async)
+ * Generate a certificate (async)
  *
- * @param {CertificateField[]} attrs Attributes used for subject and issuer.
+ * @param {CertificateField[]} attrs Attributes used for subject.
  * @param {object} options
  * @param {number} [options.days=365] the number of days before expiration
  * @param {number} [options.keySize=2048] the size for the private key in bits
@@ -272,6 +338,9 @@ async function generatePemAsync(keyPair, attrs, options) {
  * @param {string} [options.algorithm="sha1"] The signature algorithm sha256, sha384, sha512 or sha1
  * @param {boolean} [options.clientCertificate=false] generate client cert signed by the original key
  * @param {string} [options.clientCertificateCN="John Doe jdoe123"] client certificate's common name
+ * @param {object} [options.ca] CA certificate and key for signing (if not provided, generates self-signed)
+ * @param {string} [options.ca.key] CA private key in PEM format
+ * @param {string} [options.ca.cert] CA certificate in PEM format
  * @returns {Promise<object>} Promise that resolves with certificate data
  */
 exports.generate = async function generate(attrs, options) {
@@ -302,5 +371,5 @@ exports.generate = async function generate(attrs, options) {
     );
   }
 
-  return await generatePemAsync(keyPair, attrs, options);
+  return await generatePemAsync(keyPair, attrs, options, options.ca);
 };
