@@ -20,7 +20,7 @@ npm install selfsigned
 const selfsigned = require('selfsigned');
 
 const attrs = [{ name: 'commonName', value: 'contoso.com' }];
-const pems = await selfsigned.generate(attrs, { days: 365 });
+const pems = await selfsigned.generate(attrs);
 console.log(pems);
 ```
 
@@ -40,14 +40,38 @@ console.log(pems);
 ```js
 const pems = await selfsigned.generate(null, {
   keySize: 2048, // the size for the private key in bits (default: 2048)
-  days: 30, // how long till expiry of the signed certificate (default: 365)
-  notBeforeDate: new Date(), // The date before which the certificate should not be valid (default: now)
+  notBeforeDate: new Date(), // start of certificate validity (default: now)
+  notAfterDate: new Date('2026-01-01'), // end of certificate validity (default: notBeforeDate + 365 days)
   algorithm: 'sha256', // sign the certificate with specified algorithm (default: 'sha1')
   extensions: [{ name: 'basicConstraints', cA: true }], // certificate extensions array
   clientCertificate: true, // generate client cert signed by the original key (default: false)
   clientCertificateCN: 'jdoe', // client certificate's common name (default: 'John Doe jdoe123')
   clientCertificateKeySize: 2048, // the size for the client private key in bits (default: 2048)
   ca: { key: '...', cert: '...' } // CA key and cert for signing (default: self-signed)
+});
+```
+
+### Setting Custom Validity Period
+
+Use `notBeforeDate` and `notAfterDate` to control certificate validity:
+
+```js
+// Using date-fns
+const { addDays, addYears } = require('date-fns');
+
+const pems = await selfsigned.generate(null, {
+  notBeforeDate: new Date(),
+  notAfterDate: addDays(new Date(), 30) // Valid for 30 days
+});
+
+// Or with vanilla JS
+const notBefore = new Date();
+const notAfter = new Date(notBefore);
+notAfter.setFullYear(notAfter.getFullYear() + 2); // Valid for 2 years
+
+const pems = await selfsigned.generate(null, {
+  notBeforeDate: notBefore,
+  notAfterDate: notAfter
 });
 ```
 
@@ -179,7 +203,7 @@ PKCS#7 formatting is available through a separate module for better tree-shaking
 const selfsigned = require('selfsigned');
 const { createPkcs7 } = require('selfsigned/pkcs7');
 
-const pems = await selfsigned.generate(attrs, { days: 365 });
+const pems = await selfsigned.generate(attrs);
 const pkcs7 = createPkcs7(pems.cert);
 console.log(pkcs7); // PKCS#7 formatted certificate
 ```
@@ -201,6 +225,7 @@ Version 5.0 introduces breaking changes:
 2. **No callback support**: Callbacks have been removed. Use `async`/`await` or `.then()`.
 3. **Minimum Node.js version**: Now requires Node.js >= 15.6.0 (was >= 10).
 4. **Dependencies**: Replaced `node-forge` with `@peculiar/x509` and `pkijs` (66% smaller bundle size).
+5. **`days` option removed**: Use `notAfterDate` instead. Default validity is 365 days from `notBeforeDate`.
 
 ### Migration Examples
 
@@ -218,11 +243,16 @@ selfsigned.generate(attrs, { days: 365 }, function(err, pems) {
 
 **New (v5.x):**
 ```js
-// Async/await
-const pems = await selfsigned.generate(attrs, { days: 365 });
+// Async/await (default 365 days validity)
+const pems = await selfsigned.generate(attrs);
+
+// Custom validity with notAfterDate
+const notAfter = new Date();
+notAfter.setDate(notAfter.getDate() + 30); // 30 days
+const pems = await selfsigned.generate(attrs, { notAfterDate: notAfter });
 
 // Or with .then()
-selfsigned.generate(attrs, { days: 365 })
+selfsigned.generate(attrs)
   .then(pems => console.log(pems))
   .catch(err => console.error(err));
 ```

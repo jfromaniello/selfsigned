@@ -98,24 +98,26 @@ describe('CA signing', function () {
     assert.ok(cert512.publicKey, 'should generate sha512 CA-signed cert');
   });
 
-  it('should respect days option with CA signing', async function () {
+  it('should respect notAfterDate option with CA signing', async function () {
     const ca = await generate([{ name: 'commonName', value: 'Test CA' }], {
       algorithm: 'sha256'
     });
 
-    const customDays = 30;
+    const notBefore = new Date('2025-01-01T00:00:00Z');
+    const notAfter = new Date('2025-01-31T00:00:00Z'); // 30 days validity
     const pems = await generate([{ name: 'commonName', value: 'short-lived.local' }], {
       algorithm: 'sha256',
-      days: customDays,
+      notBeforeDate: notBefore,
+      notAfterDate: notAfter,
       ca: { key: ca.private, cert: ca.cert }
     });
 
     const cert = new crypto.X509Certificate(pems.cert);
     const validFrom = new Date(cert.validFrom);
     const validTo = new Date(cert.validTo);
-    const diffDays = Math.ceil((validTo - validFrom) / (1000 * 60 * 60 * 24));
 
-    assert.approximately(diffDays, customDays, 1, 'certificate should be valid for specified days');
+    assert.approximately(validFrom.getTime(), notBefore.getTime(), 5000, 'should use custom notBeforeDate');
+    assert.approximately(validTo.getTime(), notAfter.getTime(), 5000, 'should use custom notAfterDate');
   });
 
   it('should generate unique certificates with same CA', async function () {

@@ -122,9 +122,8 @@ describe('generate', function () {
     assert.ok(cert.publicKey, 'can generate sha512 certs');
   });
 
-  it('should respect custom days option', async function () {
-    const customDays = 30;
-    var pems = await generate(null, { days: customDays });
+  it('should default to 365 days validity', async function () {
+    var pems = await generate();
     const cert = new crypto.X509Certificate(pems.cert);
 
     const validFrom = new Date(cert.validFrom);
@@ -132,17 +131,30 @@ describe('generate', function () {
     const diffTime = Math.abs(validTo - validFrom);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    assert.approximately(diffDays, customDays, 1, 'certificate should be valid for specified days');
+    assert.approximately(diffDays, 365, 1, 'certificate should default to 365 days validity');
   });
 
   it('should respect notBeforeDate option', async function () {
     const customDate = new Date('2025-01-01T00:00:00Z');
-    var pems = await generate(null, { notBeforeDate: customDate, days: 365 });
+    var pems = await generate(null, { notBeforeDate: customDate });
     const cert = new crypto.X509Certificate(pems.cert);
 
     const validFrom = new Date(cert.validFrom);
     // Allow small difference for processing time
     assert.approximately(validFrom.getTime(), customDate.getTime(), 5000, 'should use custom notBeforeDate');
+  });
+
+  it('should respect notAfterDate option', async function () {
+    const notBefore = new Date('2025-01-01T00:00:00Z');
+    const notAfter = new Date('2025-02-15T00:00:00Z');
+    var pems = await generate(null, { notBeforeDate: notBefore, notAfterDate: notAfter });
+    const cert = new crypto.X509Certificate(pems.cert);
+
+    const validFrom = new Date(cert.validFrom);
+    const validTo = new Date(cert.validTo);
+
+    assert.approximately(validFrom.getTime(), notBefore.getTime(), 5000, 'should use custom notBeforeDate');
+    assert.approximately(validTo.getTime(), notAfter.getTime(), 5000, 'should use custom notAfterDate');
   });
 
   it('should generate valid fingerprint format', async function () {

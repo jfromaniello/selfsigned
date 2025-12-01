@@ -129,8 +129,13 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
 
   // Set up dates
   const notBefore = options.notBeforeDate || new Date();
-  const notAfter = new Date();
-  notAfter.setDate(notBefore.getDate() + (options.days || 365));
+  let notAfter;
+  if (options.notAfterDate) {
+    notAfter = options.notAfterDate;
+  } else {
+    notAfter = new Date(notBefore);
+    notAfter.setDate(notAfter.getDate() + 365);
+  }
 
   // Default attributes
   attrs = attrs || [
@@ -332,10 +337,11 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
  *
  * @param {CertificateField[]} attrs Attributes used for subject.
  * @param {object} options
- * @param {number} [options.days=365] the number of days before expiration
  * @param {number} [options.keySize=2048] the size for the private key in bits
  * @param {object} [options.extensions] additional extensions for the certificate
  * @param {string} [options.algorithm="sha1"] The signature algorithm sha256, sha384, sha512 or sha1
+ * @param {Date} [options.notBeforeDate=new Date()] The date before which the certificate should not be valid
+ * @param {Date} [options.notAfterDate] The date after which the certificate should not be valid (default: notBeforeDate + 365 days)
  * @param {boolean} [options.clientCertificate=false] generate client cert signed by the original key
  * @param {string} [options.clientCertificateCN="John Doe jdoe123"] client certificate's common name
  * @param {object} [options.ca] CA certificate and key for signing (if not provided, generates self-signed)

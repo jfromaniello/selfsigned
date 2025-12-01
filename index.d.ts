@@ -20,16 +20,16 @@ interface CertificateField extends CertificateFieldOptions {
 
 declare interface SelfsignedOptions {
   /**
-   * The number of days before expiration
-   *
-   * @default 365 */
-  days?: number
-
-  /**
    * The date before which the certificate should not be valid
    *
    * @default now */
   notBeforeDate?: Date
+
+  /**
+   * The date after which the certificate should not be valid
+   *
+   * @default notBeforeDate + 365 days */
+  notAfterDate?: Date
 
   /**
    * the size for the private key in bits
