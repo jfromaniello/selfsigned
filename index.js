@@ -31,10 +31,36 @@ function getAlgorithmName(key) {
   }
 }
 
-function getSigningAlgorithm(key) {
-  const hashAlg = getAlgorithmName(key);
+function getSigningAlgorithm(hashKey, keyType) {
+  const hashAlg = getAlgorithmName(hashKey);
+  if (keyType === 'ec') {
+    return {
+      name: "ECDSA",
+      hash: hashAlg
+    };
+  }
   return {
     name: "RSASSA-PKCS1-v1_5",
+    hash: hashAlg
+  };
+}
+
+function getKeyAlgorithm(options) {
+  const keyType = options.keyType || 'rsa';
+  const hashAlg = getAlgorithmName(options.algorithm || 'sha1');
+
+  if (keyType === 'ec') {
+    const curve = options.curve || 'P-256';
+    return {
+      name: "ECDSA",
+      namedCurve: curve
+    };
+  }
+
+  return {
+    name: "RSASSA-PKCS1-v1_5",
+    modulusLength: options.keySize || 2048,
+    publicExponent: new Uint8Array([1, 0, 1]),
     hash: hashAlg
   };
 }
@@ -57,50 +83,73 @@ function convertAttributes(attrs) {
   }).join(', ');
 }
 
-// Convert PEM key to CryptoKey
-async function importPrivateKey(pemKey, algorithm) {
-  // Support both PKCS#8 and PKCS#1 (RSA) formats
-  const pkcs8Match = pemKey.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
-  const rsaMatch = pemKey.match(/-----BEGIN RSA PRIVATE KEY-----([\s\S]*?)-----END RSA PRIVATE KEY-----/);
-
-  if (pkcs8Match) {
-    const pemContents = pkcs8Match[1].replace(/\s/g, '');
-    const binaryDer = Buffer.from(pemContents, 'base64');
-    return await crypto.subtle.importKey(
-      'pkcs8',
-      binaryDer,
-      {
-        name: 'RSASSA-PKCS1-v1_5',
-        hash: getAlgorithmName(algorithm),
-      },
-      true,
-      ['sign']
-    );
-  } else if (rsaMatch) {
-    // PKCS#1 RSA key - need to convert using Node.js crypto
-    const keyObject = nodeCrypto.createPrivateKey(pemKey);
-    const pkcs8Pem = keyObject.export({ type: 'pkcs8', format: 'pem' });
-    const pemContents = pkcs8Pem
-      .replace(/-----BEGIN PRIVATE KEY-----/, '')
-      .replace(/-----END PRIVATE KEY-----/, '')
-      .replace(/\s/g, '');
-    const binaryDer = Buffer.from(pemContents, 'base64');
-    return await crypto.subtle.importKey(
-      'pkcs8',
-      binaryDer,
-      {
-        name: 'RSASSA-PKCS1-v1_5',
-        hash: getAlgorithmName(algorithm),
-      },
-      true,
-      ['sign']
-    );
-  } else {
-    throw new Error('Unsupported private key format. Expected PKCS#8 or PKCS#1 RSA key.');
-  }
+// Detect key type from PEM key using Node.js crypto
+function detectKeyType(pemKey) {
+  const keyObject = nodeCrypto.createPrivateKey(pemKey);
+  return keyObject.asymmetricKeyType; // 'rsa' or 'ec'
 }
 
-async function importPublicKey(pemKey, algorithm) {
+// Map Node.js curve names to Web Crypto curve names
+function normalizeECCurve(curveName) {
+  const curveMap = {
+    'prime256v1': 'P-256',
+    'secp384r1': 'P-384',
+    'secp521r1': 'P-521',
+    'P-256': 'P-256',
+    'P-384': 'P-384',
+    'P-521': 'P-521'
+  };
+  return curveMap[curveName] || curveName;
+}
+
+// Get EC curve from key object
+function getECCurve(keyObject) {
+  const details = keyObject.asymmetricKeyDetails;
+  if (details && details.namedCurve) {
+    return normalizeECCurve(details.namedCurve);
+  }
+  return 'P-256'; // default
+}
+
+// Convert PEM key to CryptoKey
+async function importPrivateKey(pemKey, algorithm, keyType) {
+  // Auto-detect key type if not provided
+  const keyObject = nodeCrypto.createPrivateKey(pemKey);
+  const detectedKeyType = keyObject.asymmetricKeyType;
+  const actualKeyType = keyType || detectedKeyType;
+
+  // Convert to PKCS#8 format
+  const pkcs8Pem = keyObject.export({ type: 'pkcs8', format: 'pem' });
+  const pemContents = pkcs8Pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const binaryDer = Buffer.from(pemContents, 'base64');
+
+  let importAlgorithm;
+  if (actualKeyType === 'ec') {
+    const curve = getECCurve(keyObject);
+    importAlgorithm = {
+      name: 'ECDSA',
+      namedCurve: curve
+    };
+  } else {
+    importAlgorithm = {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: getAlgorithmName(algorithm)
+    };
+  }
+
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    importAlgorithm,
+    true,
+    ['sign']
+  );
+}
+
+async function importPublicKey(pemKey, algorithm, keyType, curve) {
   const pemContents = pemKey
     .replace(/-----BEGIN PUBLIC KEY-----/, '')
     .replace(/-----END PUBLIC KEY-----/, '')
@@ -108,13 +157,23 @@ async function importPublicKey(pemKey, algorithm) {
 
   const binaryDer = Buffer.from(pemContents, 'base64');
 
+  let importAlgorithm;
+  if (keyType === 'ec') {
+    importAlgorithm = {
+      name: 'ECDSA',
+      namedCurve: curve || 'P-256'
+    };
+  } else {
+    importAlgorithm = {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: getAlgorithmName(algorithm)
+    };
+  }
+
   return await crypto.subtle.importKey(
     'spki',
     binaryDer,
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      hash: getAlgorithmName(algorithm),
-    },
+    importAlgorithm,
     true,
     ['verify']
   );
@@ -166,7 +225,8 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
   ];
 
   const subjectName = convertAttributes(attrs);
-  const signingAlg = getSigningAlgorithm(options.algorithm);
+  const keyType = options.keyType || 'rsa';
+  const signingAlg = getSigningAlgorithm(options.algorithm, keyType);
 
   // Extract common name for SAN extension
   const commonNameAttr = attrs.find(attr => attr.name === 'commonName' || attr.shortName === 'CN');
@@ -188,7 +248,7 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
   if (ca) {
     // Generate certificate signed by CA
     const caCert = new X509Certificate(ca.cert);
-    const caPrivateKey = await importPrivateKey(ca.key, options.algorithm || "sha256");
+    const caPrivateKey = await importPrivateKey(ca.key, options.algorithm || "sha256", keyType);
 
     cert = await X509CertificateGenerator.create({
       serialNumber: serialHex,
@@ -273,14 +333,19 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
     const clientKeySize = clientOpts.keySize || options.clientCertificateKeySize || 2048;
     const clientAlgorithm = clientOpts.algorithm || options.algorithm || "sha1";
     const clientCN = clientOpts.cn || options.clientCertificateCN || "John Doe jdoe123";
+    // Client cert uses same key type and curve as main cert by default
+    const clientKeyType = clientOpts.keyType || keyType;
+    const clientCurve = clientOpts.curve || options.curve || 'P-256';
+
+    const clientKeyAlg = getKeyAlgorithm({
+      keyType: clientKeyType,
+      keySize: clientKeySize,
+      algorithm: clientAlgorithm,
+      curve: clientCurve
+    });
 
     const clientKeyPair = await crypto.subtle.generateKey(
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        modulusLength: clientKeySize,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: getAlgorithmName(clientAlgorithm),
-      },
+      clientKeyAlg,
       true,
       ["sign", "verify"]
     );
@@ -311,8 +376,8 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
     const clientSubjectName = convertAttributes(clientAttrs);
     const issuerName = convertAttributes(attrs);
 
-    // Signing algorithm for client cert (can differ from main cert)
-    const clientSigningAlg = getSigningAlgorithm(clientAlgorithm);
+    // Signing algorithm for client cert - uses main key type since signed by root
+    const clientSigningAlg = getSigningAlgorithm(clientAlgorithm, keyType);
 
     // Create client cert signed by root key
     const clientCertRaw = await X509CertificateGenerator.create({
@@ -370,13 +435,17 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
  *
  * @param {CertificateField[]} attrs Attributes used for subject.
  * @param {object} options
- * @param {number} [options.keySize=2048] the size for the private key in bits
+ * @param {string} [options.keyType="rsa"] Key type: "rsa" or "ec" (elliptic curve)
+ * @param {number} [options.keySize=2048] the size for the private key in bits (RSA only)
+ * @param {string} [options.curve="P-256"] The elliptic curve to use: "P-256", "P-384", or "P-521" (EC only)
  * @param {object} [options.extensions] additional extensions for the certificate
  * @param {string} [options.algorithm="sha1"] The signature algorithm sha256, sha384, sha512 or sha1
  * @param {Date} [options.notBeforeDate=new Date()] The date before which the certificate should not be valid
  * @param {Date} [options.notAfterDate] The date after which the certificate should not be valid (default: notBeforeDate + 365 days)
  * @param {boolean|object} [options.clientCertificate=false] Generate client cert signed by the original key. Can be `true` for defaults or an options object.
- * @param {number} [options.clientCertificate.keySize=2048] Key size for the client certificate in bits
+ * @param {number} [options.clientCertificate.keySize=2048] Key size for the client certificate in bits (RSA only)
+ * @param {string} [options.clientCertificate.keyType] Key type for client cert (defaults to main keyType)
+ * @param {string} [options.clientCertificate.curve] Elliptic curve for client cert (EC only)
  * @param {string} [options.clientCertificate.algorithm] Signature algorithm for client cert (defaults to options.algorithm or "sha1")
  * @param {string} [options.clientCertificate.cn="John Doe jdoe123"] Client certificate's common name
  * @param {Date} [options.clientCertificate.notBeforeDate=new Date()] The date before which the client certificate should not be valid
@@ -393,25 +462,22 @@ exports.generate = async function generate(attrs, options) {
   attrs = attrs || undefined;
   options = options || {};
 
-  const keySize = options.keySize || 2048;
+  const keyType = options.keyType || 'rsa';
+  const curve = options.curve || 'P-256';
 
   let keyPair;
 
   if (options.keyPair) {
     // Import existing key pair
     keyPair = {
-      privateKey: await importPrivateKey(options.keyPair.privateKey, options.algorithm || "sha1"),
-      publicKey: await importPublicKey(options.keyPair.publicKey, options.algorithm || "sha1")
+      privateKey: await importPrivateKey(options.keyPair.privateKey, options.algorithm || "sha1", keyType),
+      publicKey: await importPublicKey(options.keyPair.publicKey, options.algorithm || "sha1", keyType, curve)
     };
   } else {
-    // Generate new key pair
+    // Generate new key pair using appropriate algorithm
+    const keyAlg = getKeyAlgorithm(options);
     keyPair = await crypto.subtle.generateKey(
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        modulusLength: keySize,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: getAlgorithmName(options.algorithm || "sha1"),
-      },
+      keyAlg,
       true,
       ["sign", "verify"]
     );

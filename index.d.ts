@@ -18,6 +18,44 @@ interface CertificateField extends CertificateFieldOptions {
     extensions?: any[] | undefined;
 }
 
+declare interface ClientCertificateOptions {
+  /**
+   * Key size for the client certificate in bits (RSA only)
+   * @default 2048
+   */
+  keySize?: number
+  /**
+   * Key type for client certificate
+   * @default inherits from main keyType
+   */
+  keyType?: 'rsa' | 'ec'
+  /**
+   * Elliptic curve for client certificate (EC only)
+   * @default "P-256"
+   */
+  curve?: 'P-256' | 'P-384' | 'P-521'
+  /**
+   * Signature algorithm for client certificate
+   * @default inherits from main algorithm or "sha1"
+   */
+  algorithm?: string
+  /**
+   * Client certificate's common name
+   * @default "John Doe jdoe123"
+   */
+  cn?: string
+  /**
+   * The date before which the client certificate should not be valid
+   * @default now
+   */
+  notBeforeDate?: Date
+  /**
+   * The date after which the client certificate should not be valid
+   * @default notBeforeDate + 1 year
+   */
+  notAfterDate?: Date
+}
+
 declare interface SelfsignedOptions {
   /**
    * The date before which the certificate should not be valid
@@ -32,10 +70,20 @@ declare interface SelfsignedOptions {
   notAfterDate?: Date
 
   /**
-   * the size for the private key in bits
+   * Key type: "rsa" or "ec" (elliptic curve)
+   * @default "rsa"
+   */
+  keyType?: 'rsa' | 'ec'
+  /**
+   * the size for the private key in bits (RSA only)
    * @default 2048
    */
   keySize?: number
+  /**
+   * The elliptic curve to use (EC only): "P-256", "P-384", or "P-521"
+   * @default "P-256"
+   */
+  curve?: 'P-256' | 'P-384' | 'P-521'
   /**
    * additional extensions for the certificate
    */
@@ -52,17 +100,20 @@ declare interface SelfsignedOptions {
   pkcs7?: boolean
   /**
    * generate client cert signed by the original key
+   * Can be `true` for defaults or an options object
    * @default false
    */
-  clientCertificate?: boolean
+  clientCertificate?: boolean | ClientCertificateOptions
   /**
    * client certificate's common name
    * @default "John Doe jdoe123"
+   * @deprecated Use clientCertificate.cn instead
    */
   clientCertificateCN?: string
   /**
    * the size for the client private key in bits
    * @default 2048
+   * @deprecated Use clientCertificate.keySize instead
    */
    clientCertificateKeySize?: number
   /**

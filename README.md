@@ -39,7 +39,9 @@ console.log(pems);
 
 ```js
 const pems = await selfsigned.generate(null, {
-  keySize: 2048, // the size for the private key in bits (default: 2048)
+  keyType: 'rsa', // key type: 'rsa' or 'ec' (default: 'rsa')
+  keySize: 2048, // the size for the private key in bits (default: 2048, RSA only)
+  curve: 'P-256', // elliptic curve: 'P-256', 'P-384', or 'P-521' (default: 'P-256', EC only)
   notBeforeDate: new Date(), // start of certificate validity (default: now)
   notAfterDate: new Date('2026-01-01'), // end of certificate validity (default: notBeforeDate + 365 days)
   algorithm: 'sha256', // sign the certificate with specified algorithm (default: 'sha1')
@@ -80,6 +82,56 @@ const pems = await selfsigned.generate(null, {
 - `sha256`
 - `sha384`
 - `sha512`
+
+### Elliptic Curve (EC) Keys
+
+By default, selfsigned generates RSA keys. You can generate certificates using elliptic curve cryptography instead, which provides equivalent security with smaller key sizes and faster operations.
+
+```js
+// Generate EC certificate with P-256 curve (default)
+const pems = await selfsigned.generate(null, { keyType: 'ec' });
+
+// Generate EC certificate with P-384 curve
+const pems = await selfsigned.generate(null, { keyType: 'ec', curve: 'P-384' });
+
+// Generate EC certificate with P-521 curve and SHA-512
+const pems = await selfsigned.generate(null, {
+  keyType: 'ec',
+  curve: 'P-521',
+  algorithm: 'sha512'
+});
+```
+
+**Supported curves:**
+- `P-256` (default) - 128-bit security, fastest
+- `P-384` - 192-bit security
+- `P-521` - 256-bit security, strongest
+
+EC keys work with all other options including `clientCertificate`, `passphrase`, `ca`, and `keyPair`:
+
+```js
+// EC certificate with encrypted private key
+const pems = await selfsigned.generate(null, {
+  keyType: 'ec',
+  passphrase: 'secret'
+});
+
+// EC certificate with client certificate
+const pems = await selfsigned.generate(null, {
+  keyType: 'ec',
+  clientCertificate: true
+});
+
+// Reuse existing EC key pair
+const pems = await selfsigned.generate(null, {
+  keyType: 'ec',
+  curve: 'P-256',
+  keyPair: {
+    publicKey: existingPublicKey,
+    privateKey: existingPrivateKey
+  }
+});
+```
 
 ### Using Your Own Keys
 
@@ -234,7 +286,9 @@ The `clientCertificate` option can be `true` for defaults, or an options object 
 const pems = await selfsigned.generate(null, {
   clientCertificate: {
     cn: 'jdoe',                              // common name (default: 'John Doe jdoe123')
-    keySize: 4096,                           // key size in bits (default: 2048)
+    keyType: 'rsa',                          // key type: 'rsa' or 'ec' (default: inherits from parent)
+    keySize: 4096,                           // key size in bits (default: 2048, RSA only)
+    curve: 'P-256',                          // elliptic curve (default: 'P-256', EC only)
     algorithm: 'sha256',                     // signature algorithm (default: inherits from parent or 'sha1')
     notBeforeDate: new Date(),               // validity start (default: now)
     notAfterDate: new Date('2026-01-01')     // validity end (default: notBeforeDate + 1 year)
