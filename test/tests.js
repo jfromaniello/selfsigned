@@ -294,4 +294,44 @@ describe('generate', function () {
     const cert = new crypto.X509Certificate(pems.cert);
     assert.include(cert.subject, 'CN=minimal.test', 'should work with minimal attributes');
   });
+
+  it('should support passphrase for private key encryption', async function () {
+    const passphrase = 'my-secret-passphrase';
+    var pems = await generate(null, { passphrase: passphrase });
+
+    assert.ok(!!pems.private, 'has a private key');
+    assert.include(pems.private, 'ENCRYPTED', 'private key should be encrypted');
+
+    // Verify the key can be decrypted with the correct passphrase
+    const privateKey = crypto.createPrivateKey({
+      key: pems.private,
+      passphrase: passphrase
+    });
+    assert.ok(privateKey, 'should be able to decrypt private key with passphrase');
+
+    // Verify signing works with decrypted key
+    const testData = 'Hello, World!';
+    const sign = crypto.createSign('SHA256');
+    sign.update(testData);
+    sign.end();
+    const signature = sign.sign({ key: pems.private, passphrase: passphrase });
+
+    const verify = crypto.createVerify('SHA256');
+    verify.update(testData);
+    verify.end();
+    const isValid = verify.verify(pems.public, signature);
+    assert.isTrue(isValid, 'encrypted key should work for signing');
+  });
+
+  it('should fail to decrypt private key with wrong passphrase', async function () {
+    const passphrase = 'correct-passphrase';
+    var pems = await generate(null, { passphrase: passphrase });
+
+    assert.throws(() => {
+      crypto.createPrivateKey({
+        key: pems.private,
+        passphrase: 'wrong-passphrase'
+      });
+    });
+  });
 });

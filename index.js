@@ -229,10 +229,26 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
   const privateKeyDer = await crypto.subtle.exportKey('pkcs8', privateKey);
   const publicKeyDer = await crypto.subtle.exportKey('spki', publicKey);
 
-  const privatePem =
-    '-----BEGIN PRIVATE KEY-----\n' +
-    Buffer.from(privateKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
-    '\n-----END PRIVATE KEY-----\n';
+  let privatePem;
+  if (options.passphrase) {
+    // Encrypt the private key with the passphrase using Node.js crypto
+    const keyObject = nodeCrypto.createPrivateKey({
+      key: Buffer.from(privateKeyDer),
+      format: 'der',
+      type: 'pkcs8'
+    });
+    privatePem = keyObject.export({
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: options.passphrase
+    });
+  } else {
+    privatePem =
+      '-----BEGIN PRIVATE KEY-----\n' +
+      Buffer.from(privateKeyDer).toString('base64').match(/.{1,64}/g).join('\n') +
+      '\n-----END PRIVATE KEY-----\n';
+  }
 
   const publicPem =
     '-----BEGIN PUBLIC KEY-----\n' +
@@ -347,6 +363,7 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
  * @param {object} [options.ca] CA certificate and key for signing (if not provided, generates self-signed)
  * @param {string} [options.ca.key] CA private key in PEM format
  * @param {string} [options.ca.cert] CA certificate in PEM format
+ * @param {string} [options.passphrase] Passphrase to encrypt the private key (uses AES-256-CBC)
  * @returns {Promise<object>} Promise that resolves with certificate data
  */
 exports.generate = async function generate(attrs, options) {

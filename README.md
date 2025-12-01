@@ -47,7 +47,8 @@ const pems = await selfsigned.generate(null, {
   clientCertificate: true, // generate client cert signed by the original key (default: false)
   clientCertificateCN: 'jdoe', // client certificate's common name (default: 'John Doe jdoe123')
   clientCertificateKeySize: 2048, // the size for the client private key in bits (default: 2048)
-  ca: { key: '...', cert: '...' } // CA key and cert for signing (default: self-signed)
+  ca: { key: '...', cert: '...' }, // CA key and cert for signing (default: self-signed)
+  passphrase: 'secret' // encrypt the private key with a passphrase (default: none)
 });
 ```
 
@@ -93,6 +94,41 @@ const pems = await selfsigned.generate(null, {
     privateKey: '-----BEGIN PRIVATE KEY-----...'
   }
 });
+```
+
+### Encrypting the Private Key
+
+You can encrypt the private key with a passphrase using AES-256-CBC:
+
+```js
+const pems = await selfsigned.generate(null, {
+  passphrase: 'my-secret-passphrase'
+});
+
+// The private key will be in encrypted PKCS#8 format:
+// -----BEGIN ENCRYPTED PRIVATE KEY-----
+// ...
+// -----END ENCRYPTED PRIVATE KEY-----
+```
+
+To use the encrypted key, provide the passphrase:
+
+```js
+const crypto = require('crypto');
+
+// Decrypt the key
+const privateKey = crypto.createPrivateKey({
+  key: pems.private,
+  passphrase: 'my-secret-passphrase'
+});
+
+// Or use directly with HTTPS server
+const https = require('https');
+https.createServer({
+  key: pems.private,
+  passphrase: 'my-secret-passphrase',
+  cert: pems.cert
+}, app).listen(443);
 ```
 
 ### Signing with a CA

@@ -81,6 +81,11 @@ declare interface SelfsignedOptions {
      /** CA certificate in PEM format */
      cert: string
    }
+  /**
+   * Passphrase to encrypt the private key (PKCS#8 encrypted format)
+   * When provided, the private key will be encrypted using AES-256-CBC
+   */
+   passphrase?: string
 }
 
 declare interface GenerateResult {
