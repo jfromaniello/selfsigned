@@ -266,12 +266,20 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
 
   // Client certificate support
   if (options && options.clientCertificate) {
+    // Parse clientCertificate options - can be boolean or object
+    const clientOpts = typeof options.clientCertificate === 'object' ? options.clientCertificate : {};
+
+    // Resolve client certificate options with fallbacks to deprecated options
+    const clientKeySize = clientOpts.keySize || options.clientCertificateKeySize || 2048;
+    const clientAlgorithm = clientOpts.algorithm || options.algorithm || "sha1";
+    const clientCN = clientOpts.cn || options.clientCertificateCN || "John Doe jdoe123";
+
     const clientKeyPair = await crypto.subtle.generateKey(
       {
         name: "RSASSA-PKCS1-v1_5",
-        modulusLength: options.clientCertificateKeySize || 2048,
+        modulusLength: clientKeySize,
         publicExponent: new Uint8Array([1, 0, 1]),
-        hash: getAlgorithmName(options.algorithm || "sha1"),
+        hash: getAlgorithmName(clientAlgorithm),
       },
       true,
       ["sign", "verify"]
@@ -280,22 +288,31 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
     const clientSerialBytes = crypto.getRandomValues(new Uint8Array(9));
     const clientSerialHex = toPositiveHex(Buffer.from(clientSerialBytes).toString('hex'));
 
-    const clientNotBefore = new Date();
-    const clientNotAfter = new Date();
-    clientNotAfter.setFullYear(clientNotBefore.getFullYear() + 1);
+    // Resolve client certificate validity dates
+    const clientNotBefore = clientOpts.notBeforeDate || new Date();
+    let clientNotAfter;
+    if (clientOpts.notAfterDate) {
+      clientNotAfter = clientOpts.notAfterDate;
+    } else {
+      clientNotAfter = new Date(clientNotBefore);
+      clientNotAfter.setFullYear(clientNotBefore.getFullYear() + 1);
+    }
 
     const clientAttrs = JSON.parse(JSON.stringify(attrs));
     for (let i = 0; i < clientAttrs.length; i++) {
       if (clientAttrs[i].name === "commonName") {
         clientAttrs[i] = {
           name: "commonName",
-          value: options.clientCertificateCN || "John Doe jdoe123"
+          value: clientCN
         };
       }
     }
 
     const clientSubjectName = convertAttributes(clientAttrs);
     const issuerName = convertAttributes(attrs);
+
+    // Signing algorithm for client cert (can differ from main cert)
+    const clientSigningAlg = getSigningAlgorithm(clientAlgorithm);
 
     // Create client cert signed by root key
     const clientCertRaw = await X509CertificateGenerator.create({
@@ -304,7 +321,7 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
       issuer: issuerName,
       notBefore: clientNotBefore,
       notAfter: clientNotAfter,
-      signingAlgorithm: signingAlg,
+      signingAlgorithm: clientSigningAlg,
       publicKey: clientKeyPair.publicKey,
       signingKey: privateKey // Sign with root private key
     });
@@ -358,8 +375,14 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
  * @param {string} [options.algorithm="sha1"] The signature algorithm sha256, sha384, sha512 or sha1
  * @param {Date} [options.notBeforeDate=new Date()] The date before which the certificate should not be valid
  * @param {Date} [options.notAfterDate] The date after which the certificate should not be valid (default: notBeforeDate + 365 days)
- * @param {boolean} [options.clientCertificate=false] generate client cert signed by the original key
- * @param {string} [options.clientCertificateCN="John Doe jdoe123"] client certificate's common name
+ * @param {boolean|object} [options.clientCertificate=false] Generate client cert signed by the original key. Can be `true` for defaults or an options object.
+ * @param {number} [options.clientCertificate.keySize=2048] Key size for the client certificate in bits
+ * @param {string} [options.clientCertificate.algorithm] Signature algorithm for client cert (defaults to options.algorithm or "sha1")
+ * @param {string} [options.clientCertificate.cn="John Doe jdoe123"] Client certificate's common name
+ * @param {Date} [options.clientCertificate.notBeforeDate=new Date()] The date before which the client certificate should not be valid
+ * @param {Date} [options.clientCertificate.notAfterDate] The date after which the client certificate should not be valid (default: notBeforeDate + 1 year)
+ * @param {string} [options.clientCertificateCN="John Doe jdoe123"] @deprecated Use options.clientCertificate.cn instead
+ * @param {number} [options.clientCertificateKeySize] @deprecated Use options.clientCertificate.keySize instead
  * @param {object} [options.ca] CA certificate and key for signing (if not provided, generates self-signed)
  * @param {string} [options.ca.key] CA private key in PEM format
  * @param {string} [options.ca.cert] CA certificate in PEM format

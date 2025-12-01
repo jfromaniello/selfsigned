@@ -44,9 +44,7 @@ const pems = await selfsigned.generate(null, {
   notAfterDate: new Date('2026-01-01'), // end of certificate validity (default: notBeforeDate + 365 days)
   algorithm: 'sha256', // sign the certificate with specified algorithm (default: 'sha1')
   extensions: [{ name: 'basicConstraints', cA: true }], // certificate extensions array
-  clientCertificate: true, // generate client cert signed by the original key (default: false)
-  clientCertificateCN: 'jdoe', // client certificate's common name (default: 'John Doe jdoe123')
-  clientCertificateKeySize: 2048, // the size for the client private key in bits (default: 2048)
+  clientCertificate: true, // generate client cert (default: false) - can also be an options object
   ca: { key: '...', cert: '...' }, // CA key and cert for signing (default: self-signed)
   passphrase: 'secret' // encrypt the private key with a passphrase (default: none)
 });
@@ -228,12 +226,27 @@ Output includes additional client certificate fields:
 }
 ```
 
-To override the default client CN of `John Doe jdoe123`:
+### Client Certificate Options
+
+The `clientCertificate` option can be `true` for defaults, or an options object for full control:
 
 ```js
 const pems = await selfsigned.generate(null, {
-  clientCertificate: true,
-  clientCertificateCN: 'FooBar'
+  clientCertificate: {
+    cn: 'jdoe',                              // common name (default: 'John Doe jdoe123')
+    keySize: 4096,                           // key size in bits (default: 2048)
+    algorithm: 'sha256',                     // signature algorithm (default: inherits from parent or 'sha1')
+    notBeforeDate: new Date(),               // validity start (default: now)
+    notAfterDate: new Date('2026-01-01')     // validity end (default: notBeforeDate + 1 year)
+  }
+});
+```
+
+Simple example with just a custom CN:
+
+```js
+const pems = await selfsigned.generate(null, {
+  clientCertificate: { cn: 'FooBar' }
 });
 ```
 

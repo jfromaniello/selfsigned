@@ -180,7 +180,7 @@ describe('generate', function () {
     assert.include(cert.subject, 'O=Test Corp', 'should include custom organization');
   });
 
-  it('should support custom clientCertificateCN', async function () {
+  it('should support custom clientCertificateCN (deprecated)', async function () {
     var pems = await generate(null, {
       clientCertificate: true,
       clientCertificateCN: 'Custom User CN'
@@ -188,6 +188,81 @@ describe('generate', function () {
 
     const clientCert = new crypto.X509Certificate(pems.clientcert);
     assert.include(clientCert.subject, 'CN=Custom User CN', 'should use custom client CN');
+  });
+
+  it('should support clientCertificate as options object with cn', async function () {
+    var pems = await generate(null, {
+      clientCertificate: {
+        cn: 'Client Options CN'
+      }
+    });
+
+    const clientCert = new crypto.X509Certificate(pems.clientcert);
+    assert.include(clientCert.subject, 'CN=Client Options CN', 'should use cn from clientCertificate options');
+  });
+
+  it('should support clientCertificate.keySize', async function () {
+    var pems = await generate(null, {
+      clientCertificate: {
+        keySize: 4096
+      }
+    });
+
+    const clientPrivateKey = crypto.createPrivateKey(pems.clientprivate);
+    const keyDetails = clientPrivateKey.asymmetricKeyDetails;
+    assert.strictEqual(keyDetails.modulusLength, 4096, 'should use keySize from clientCertificate options');
+  });
+
+  it('should support clientCertificate.notBeforeDate and notAfterDate', async function () {
+    const notBefore = new Date('2025-06-01T00:00:00Z');
+    const notAfter = new Date('2025-06-30T00:00:00Z');
+
+    var pems = await generate(null, {
+      clientCertificate: {
+        notBeforeDate: notBefore,
+        notAfterDate: notAfter
+      }
+    });
+
+    const clientCert = new crypto.X509Certificate(pems.clientcert);
+    const validFrom = new Date(clientCert.validFrom);
+    const validTo = new Date(clientCert.validTo);
+
+    assert.approximately(validFrom.getTime(), notBefore.getTime(), 5000, 'should use notBeforeDate from clientCertificate options');
+    assert.approximately(validTo.getTime(), notAfter.getTime(), 5000, 'should use notAfterDate from clientCertificate options');
+  });
+
+  it('should support clientCertificate.algorithm', async function () {
+    var pems = await generate(null, {
+      algorithm: 'sha1',  // main cert uses sha1
+      clientCertificate: {
+        algorithm: 'sha256'  // client cert uses sha256
+      }
+    });
+
+    // Both certs should be valid
+    const serverCert = new crypto.X509Certificate(pems.cert);
+    const clientCert = new crypto.X509Certificate(pems.clientcert);
+    assert.ok(serverCert.publicKey, 'server cert should be valid');
+    assert.ok(clientCert.publicKey, 'client cert should be valid');
+  });
+
+  it('clientCertificate options should take precedence over deprecated options', async function () {
+    var pems = await generate(null, {
+      clientCertificateCN: 'Deprecated CN',
+      clientCertificateKeySize: 2048,
+      clientCertificate: {
+        cn: 'New Options CN',
+        keySize: 4096
+      }
+    });
+
+    const clientCert = new crypto.X509Certificate(pems.clientcert);
+    assert.include(clientCert.subject, 'CN=New Options CN', 'clientCertificate.cn should take precedence');
+
+    const clientPrivateKey = crypto.createPrivateKey(pems.clientprivate);
+    const keyDetails = clientPrivateKey.asymmetricKeyDetails;
+    assert.strictEqual(keyDetails.modulusLength, 4096, 'clientCertificate.keySize should take precedence');
   });
 
   it('should generate valid key pair that work together', async function () {
