@@ -122,15 +122,20 @@ The generated certificate will be signed by the provided CA and will include:
 
 #### Using with mkcert
 
-[mkcert](https://github.com/FiloSottile/mkcert) is a popular tool for creating locally-trusted development certificates. You can use its CA to sign certificates:
+[mkcert](https://github.com/FiloSottile/mkcert) is a simple tool for making locally-trusted development certificates. Combining it with `selfsigned` provides an excellent developer experience:
+
+- **No certificate files to manage** - generate trusted certificates on-the-fly at server startup
+- **No git-ignored cert files** - nothing to store, share, or accidentally commit
+- **Browsers trust the certificates automatically** - no security warnings during development
 
 ```js
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const selfsigned = require('selfsigned');
 
-// Get mkcert's CA root path
+// Get mkcert's CA (requires: brew install mkcert && mkcert -install)
 const caroot = execSync('mkcert -CAROOT', { encoding: 'utf8' }).trim();
 
 const pems = await selfsigned.generate([
@@ -143,10 +148,11 @@ const pems = await selfsigned.generate([
   }
 });
 
-// Browsers will trust this certificate if `mkcert -install` was run
+// Start server with browser-trusted certificate - no files written to disk
+https.createServer({ key: pems.private, cert: pems.cert }, app).listen(443);
 ```
 
-See [examples/https-server-mkcert.js](examples/https-server-mkcert.js) for a complete example.
+See [examples/https-server-mkcert.js](examples/https-server-mkcert.js) for a complete working example.
 
 ## Attributes
 
