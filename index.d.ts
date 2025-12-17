@@ -18,6 +18,83 @@ interface CertificateField extends CertificateFieldOptions {
     extensions?: any[] | undefined;
 }
 
+/**
+ * Subject Alternative Name entry types:
+ * - 1: email (rfc822Name)
+ * - 2: DNS name
+ * - 6: URI
+ * - 7: IP address
+ */
+declare interface SubjectAltNameEntry {
+  /**
+   * Type of the alternative name:
+   * - 1: email (rfc822Name)
+   * - 2: DNS name
+   * - 6: URI
+   * - 7: IP address
+   */
+  type: 1 | 2 | 6 | 7;
+  /** Value for types 1, 2, 6 (email, DNS, URI) */
+  value?: string;
+  /** IP address for type 7 (IPv4 or IPv6) */
+  ip?: string;
+}
+
+declare interface BasicConstraintsExtension {
+  name: 'basicConstraints';
+  /** Is this a CA certificate? */
+  cA?: boolean;
+  /** Maximum depth of valid certificate chain */
+  pathLenConstraint?: number;
+  /** Mark extension as critical */
+  critical?: boolean;
+}
+
+declare interface KeyUsageExtension {
+  name: 'keyUsage';
+  digitalSignature?: boolean;
+  nonRepudiation?: boolean;
+  /** Also known as contentCommitment */
+  contentCommitment?: boolean;
+  keyEncipherment?: boolean;
+  dataEncipherment?: boolean;
+  keyAgreement?: boolean;
+  /** For CA certificates */
+  keyCertSign?: boolean;
+  /** For CA certificates */
+  cRLSign?: boolean;
+  encipherOnly?: boolean;
+  decipherOnly?: boolean;
+  /** Mark extension as critical */
+  critical?: boolean;
+}
+
+declare interface ExtKeyUsageExtension {
+  name: 'extKeyUsage';
+  /** TLS server authentication */
+  serverAuth?: boolean;
+  /** TLS client authentication */
+  clientAuth?: boolean;
+  codeSigning?: boolean;
+  emailProtection?: boolean;
+  timeStamping?: boolean;
+  /** Mark extension as critical */
+  critical?: boolean;
+}
+
+declare interface SubjectAltNameExtension {
+  name: 'subjectAltName';
+  altNames: SubjectAltNameEntry[];
+  /** Mark extension as critical */
+  critical?: boolean;
+}
+
+declare type CertificateExtension =
+  | BasicConstraintsExtension
+  | KeyUsageExtension
+  | ExtKeyUsageExtension
+  | SubjectAltNameExtension;
+
 declare interface ClientCertificateOptions {
   /**
    * Key size for the client certificate in bits (RSA only)
@@ -85,9 +162,22 @@ declare interface SelfsignedOptions {
    */
   curve?: 'P-256' | 'P-384' | 'P-521'
   /**
-   * additional extensions for the certificate
+   * Certificate extensions. Supports basicConstraints, keyUsage, extKeyUsage, and subjectAltName.
+   * If not provided, defaults are used including DNS SAN matching commonName.
+   * @example
+   * ```typescript
+   * extensions: [
+   *   { name: 'basicConstraints', cA: false },
+   *   { name: 'keyUsage', digitalSignature: true, keyEncipherment: true },
+   *   { name: 'subjectAltName', altNames: [
+   *     { type: 2, value: 'localhost' },
+   *     { type: 7, ip: '127.0.0.1' },
+   *     { type: 7, ip: '::1' }
+   *   ]}
+   * ]
+   * ```
    */
-  extensions?: any[];
+  extensions?: CertificateExtension[];
   /**
    * The signature algorithm: sha256, sha384, sha512 or sha1
    * @default "sha1"

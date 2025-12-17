@@ -83,6 +83,109 @@ const pems = await selfsigned.generate(null, {
 - `sha384`
 - `sha512`
 
+### Custom Extensions
+
+You can customize certificate extensions using the `extensions` option. This is useful for adding Subject Alternative Names (SANs) with IPv6 addresses, custom key usage, and more.
+
+```js
+const pems = await selfsigned.generate(
+  [{ name: 'commonName', value: 'localhost' }],
+  {
+    extensions: [
+      {
+        name: 'basicConstraints',
+        cA: false
+      },
+      {
+        name: 'keyUsage',
+        digitalSignature: true,
+        keyEncipherment: true
+      },
+      {
+        name: 'subjectAltName',
+        altNames: [
+          { type: 2, value: 'localhost' },     // DNS
+          { type: 7, ip: '127.0.0.1' },        // IPv4
+          { type: 7, ip: '::1' }               // IPv6
+        ]
+      }
+    ]
+  }
+);
+```
+
+#### Supported Extensions
+
+**basicConstraints**
+```js
+{
+  name: 'basicConstraints',
+  cA: true,                    // is this a CA certificate?
+  pathLenConstraint: 0,        // max depth of valid cert chain (optional)
+  critical: true               // mark as critical extension
+}
+```
+
+**keyUsage**
+```js
+{
+  name: 'keyUsage',
+  digitalSignature: true,
+  nonRepudiation: true,
+  keyEncipherment: true,
+  dataEncipherment: true,
+  keyAgreement: true,
+  keyCertSign: true,          // for CA certificates
+  cRLSign: true,              // for CA certificates
+  encipherOnly: true,
+  decipherOnly: true,
+  critical: true
+}
+```
+
+**extKeyUsage** (Extended Key Usage)
+```js
+{
+  name: 'extKeyUsage',
+  serverAuth: true,           // TLS server authentication
+  clientAuth: true,           // TLS client authentication
+  codeSigning: true,
+  emailProtection: true,
+  timeStamping: true
+}
+```
+
+**subjectAltName** (Subject Alternative Name)
+```js
+{
+  name: 'subjectAltName',
+  altNames: [
+    { type: 1, value: 'user@example.com' },           // email (rfc822Name)
+    { type: 2, value: 'example.com' },                // DNS name
+    { type: 2, value: '*.example.com' },              // wildcard DNS
+    { type: 6, value: 'http://example.com/webid' },   // URI
+    { type: 7, ip: '127.0.0.1' },                     // IPv4 address
+    { type: 7, ip: '::1' }                            // IPv6 address
+  ]
+}
+```
+
+#### Default Extensions
+
+When no `extensions` option is provided (or an empty array), the following defaults are used:
+
+```js
+[
+  { name: 'basicConstraints', cA: false, critical: true },
+  { name: 'keyUsage', digitalSignature: true, keyEncipherment: true, critical: true },
+  { name: 'extKeyUsage', serverAuth: true, clientAuth: true },
+  { name: 'subjectAltName', altNames: [
+    { type: 2, value: commonName },
+    // For localhost, also includes: { type: 7, ip: '127.0.0.1' }
+  ]}
+]
+```
+
 ### Elliptic Curve (EC) Keys
 
 By default, selfsigned generates RSA keys. You can generate certificates using elliptic curve cryptography instead, which provides equivalent security with smaller key sizes and faster operations.

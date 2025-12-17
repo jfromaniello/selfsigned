@@ -370,6 +370,199 @@ describe('generate', function () {
     assert.include(cert.subject, 'CN=minimal.test', 'should work with minimal attributes');
   });
 
+  describe('extensions', function () {
+    it('should support custom subjectAltName with IPv6 (issue #79)', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'localhost' }],
+        {
+          algorithm: 'sha256',
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: false
+            },
+            {
+              name: 'keyUsage',
+              digitalSignature: true,
+              keyEncipherment: true
+            },
+            {
+              name: 'subjectAltName',
+              altNames: [
+                { type: 2, value: 'localhost' }, // DNS
+                { type: 7, ip: '127.0.0.1' }, // IPv4
+                { type: 7, ip: '::1' } // IPv6
+              ]
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      assert.ok(cert.subjectAltName, 'should have subjectAltName');
+      assert.include(cert.subjectAltName, 'localhost', 'should include DNS name');
+      assert.include(cert.subjectAltName, '127.0.0.1', 'should include IPv4');
+      // IPv6 ::1 may be expanded to full form 0:0:0:0:0:0:0:1
+      const hasIPv6 = cert.subjectAltName.includes('::1') || cert.subjectAltName.includes('0:0:0:0:0:0:0:1');
+      assert.ok(hasIPv6, 'should include IPv6');
+    });
+
+    it('should support basicConstraints with cA=true', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'Test CA' }],
+        {
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: true,
+              critical: true
+            },
+            {
+              name: 'keyUsage',
+              keyCertSign: true,
+              cRLSign: true,
+              critical: true
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      assert.ok(cert.ca, 'certificate should be a CA');
+    });
+
+    it('should support keyUsage extension', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'test.example.com' }],
+        {
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: false
+            },
+            {
+              name: 'keyUsage',
+              digitalSignature: true,
+              keyEncipherment: true,
+              dataEncipherment: true
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      // Node.js X509Certificate doesn't expose keyUsage directly,
+      // but we can verify the cert is valid and can be used
+      assert.ok(cert.publicKey, 'should generate valid cert with keyUsage');
+      // Verify by using openssl to check extensions
+      const fs = require('fs');
+      fs.writeFileSync('/tmp/test-keyusage.crt', pems.cert);
+      const { execSync } = require('child_process');
+      const output = execSync('openssl x509 -in /tmp/test-keyusage.crt -text -noout').toString();
+      assert.include(output, 'Digital Signature', 'should have digitalSignature');
+      assert.include(output, 'Key Encipherment', 'should have keyEncipherment');
+    });
+
+    it('should support extKeyUsage extension', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'test.example.com' }],
+        {
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: false
+            },
+            {
+              name: 'extKeyUsage',
+              serverAuth: true,
+              clientAuth: true,
+              codeSigning: true
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      // Node.js crypto doesn't expose extended key usage directly, but cert should be valid
+      assert.ok(cert.publicKey, 'should generate valid cert with extKeyUsage');
+    });
+
+    it('should support subjectAltName with DNS names', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'example.com' }],
+        {
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: false
+            },
+            {
+              name: 'subjectAltName',
+              altNames: [
+                { type: 2, value: 'example.com' },
+                { type: 2, value: 'www.example.com' },
+                { type: 2, value: '*.example.com' }
+              ]
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      assert.include(cert.subjectAltName, 'example.com', 'should include example.com');
+      assert.include(cert.subjectAltName, 'www.example.com', 'should include www.example.com');
+      assert.include(cert.subjectAltName, '*.example.com', 'should include wildcard');
+    });
+
+    it('should support subjectAltName with email and URI', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'test.example.com' }],
+        {
+          extensions: [
+            {
+              name: 'basicConstraints',
+              cA: false
+            },
+            {
+              name: 'subjectAltName',
+              altNames: [
+                { type: 2, value: 'test.example.com' },
+                { type: 1, value: 'admin@example.com' }, // email
+                { type: 6, value: 'http://example.com/webid#me' } // URI
+              ]
+            }
+          ]
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      assert.include(cert.subjectAltName, 'test.example.com', 'should include DNS');
+      assert.include(cert.subjectAltName, 'admin@example.com', 'should include email');
+      assert.include(cert.subjectAltName, 'http://example.com/webid#me', 'should include URI');
+    });
+
+    it('should use default extensions when extensions option is empty array', async function () {
+      var pems = await generate(
+        [{ name: 'commonName', value: 'localhost' }],
+        {
+          extensions: []
+        }
+      );
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      // Default behavior includes localhost and 127.0.0.1
+      assert.include(cert.subjectAltName, 'localhost', 'should use default SAN');
+      assert.include(cert.subjectAltName, '127.0.0.1', 'should include default IP for localhost');
+    });
+
+    it('should use default extensions when extensions option is not provided', async function () {
+      var pems = await generate([{ name: 'commonName', value: 'myhost.local' }]);
+
+      const cert = new crypto.X509Certificate(pems.cert);
+      assert.include(cert.subjectAltName, 'myhost.local', 'should use commonName in default SAN');
+    });
+  });
+
   it('should support passphrase for private key encryption', async function () {
     const passphrase = 'my-secret-passphrase';
     var pems = await generate(null, { passphrase: passphrase });

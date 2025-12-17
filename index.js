@@ -65,6 +65,98 @@ function getKeyAlgorithm(options) {
   };
 }
 
+// Build extensions array from options or use defaults
+// Supports the old node-forge extension format for backwards compatibility
+function buildExtensions(userExtensions, commonName) {
+  if (!userExtensions || userExtensions.length === 0) {
+    // Default extensions
+    return [
+      new BasicConstraintsExtension(false, undefined, true),
+      new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment, true),
+      new ExtendedKeyUsageExtension([ExtendedKeyUsage.serverAuth, ExtendedKeyUsage.clientAuth], false),
+      new SubjectAlternativeNameExtension([
+        { type: 'dns', value: commonName },
+        ...(commonName === 'localhost' ? [{ type: 'ip', value: '127.0.0.1' }] : [])
+      ], false)
+    ];
+  }
+
+  // Convert user extensions from node-forge format to @peculiar/x509 format
+  const extensions = [];
+
+  for (const ext of userExtensions) {
+    const critical = ext.critical || false;
+
+    switch (ext.name) {
+      case 'basicConstraints':
+        extensions.push(new BasicConstraintsExtension(
+          ext.cA || false,
+          ext.pathLenConstraint,
+          critical
+        ));
+        break;
+
+      case 'keyUsage':
+        let flags = 0;
+        if (ext.digitalSignature) flags |= KeyUsageFlags.digitalSignature;
+        if (ext.nonRepudiation || ext.contentCommitment) flags |= KeyUsageFlags.nonRepudiation;
+        if (ext.keyEncipherment) flags |= KeyUsageFlags.keyEncipherment;
+        if (ext.dataEncipherment) flags |= KeyUsageFlags.dataEncipherment;
+        if (ext.keyAgreement) flags |= KeyUsageFlags.keyAgreement;
+        if (ext.keyCertSign) flags |= KeyUsageFlags.keyCertSign;
+        if (ext.cRLSign) flags |= KeyUsageFlags.cRLSign;
+        if (ext.encipherOnly) flags |= KeyUsageFlags.encipherOnly;
+        if (ext.decipherOnly) flags |= KeyUsageFlags.decipherOnly;
+        extensions.push(new KeyUsagesExtension(flags, critical));
+        break;
+
+      case 'extKeyUsage':
+        const usages = [];
+        if (ext.serverAuth) usages.push(ExtendedKeyUsage.serverAuth);
+        if (ext.clientAuth) usages.push(ExtendedKeyUsage.clientAuth);
+        if (ext.codeSigning) usages.push(ExtendedKeyUsage.codeSigning);
+        if (ext.emailProtection) usages.push(ExtendedKeyUsage.emailProtection);
+        if (ext.timeStamping) usages.push(ExtendedKeyUsage.timeStamping);
+        extensions.push(new ExtendedKeyUsageExtension(usages, critical));
+        break;
+
+      case 'subjectAltName':
+        const altNames = (ext.altNames || []).map(alt => {
+          // node-forge type values:
+          // 1 = email (rfc822Name)
+          // 2 = DNS
+          // 6 = URI
+          // 7 = IP
+          switch (alt.type) {
+            case 1: // email
+              return { type: 'email', value: alt.value };
+            case 2: // DNS
+              return { type: 'dns', value: alt.value };
+            case 6: // URI
+              return { type: 'url', value: alt.value };
+            case 7: // IP
+              return { type: 'ip', value: alt.ip || alt.value };
+            default:
+              // Try to infer type from properties
+              if (alt.ip) return { type: 'ip', value: alt.ip };
+              if (alt.dns) return { type: 'dns', value: alt.dns };
+              if (alt.email) return { type: 'email', value: alt.email };
+              if (alt.uri || alt.url) return { type: 'url', value: alt.uri || alt.url };
+              return { type: 'dns', value: alt.value };
+          }
+        });
+        extensions.push(new SubjectAlternativeNameExtension(altNames, critical));
+        break;
+
+      default:
+        // Skip unknown extensions with a warning
+        console.warn(`Unknown extension "${ext.name}" ignored`);
+    }
+  }
+
+  return extensions;
+}
+
 // Convert attributes from node-forge format to X509 name format
 function convertAttributes(attrs) {
   const nameMap = {
@@ -233,15 +325,7 @@ async function generatePemAsync(keyPair, attrs, options, ca) {
   const commonName = commonNameAttr ? commonNameAttr.value : 'localhost';
 
   // Build extensions array
-  const extensions = [
-    new BasicConstraintsExtension(false, undefined, true),
-    new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment, true),
-    new ExtendedKeyUsageExtension([ExtendedKeyUsage.serverAuth, ExtendedKeyUsage.clientAuth], false),
-    new SubjectAlternativeNameExtension([
-      { type: 'dns', value: commonName },
-      ...(commonName === 'localhost' ? [{ type: 'ip', value: '127.0.0.1' }] : [])
-    ], false)
-  ];
+  const extensions = buildExtensions(options.extensions, commonName);
 
   let cert;
 
