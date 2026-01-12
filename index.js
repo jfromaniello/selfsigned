@@ -1,8 +1,11 @@
-const { X509CertificateGenerator, X509Certificate, X509ChainBuilder, BasicConstraintsExtension, KeyUsagesExtension, KeyUsageFlags, ExtendedKeyUsageExtension, ExtendedKeyUsage, SubjectAlternativeNameExtension, GeneralName } = require("@peculiar/x509");
+const { X509CertificateGenerator, X509Certificate, cryptoProvider,  X509ChainBuilder, BasicConstraintsExtension, KeyUsagesExtension, KeyUsageFlags, ExtendedKeyUsageExtension, ExtendedKeyUsage, SubjectAlternativeNameExtension, GeneralName } = require("@peculiar/x509");
 const nodeCrypto = require("crypto");
 
 // Use Node.js native webcrypto
 const crypto = nodeCrypto.webcrypto;
+
+// Patch global CryptoProvider to use Node.js crypto
+cryptoProvider.set(crypto);
 
 // a hexString is considered negative if it's most significant bit is 1
 // because serial numbers use ones' complement notation
